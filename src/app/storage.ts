@@ -1,19 +1,19 @@
-import { persistedstateschema } from "../lib/validation";
-import { createseedstate } from "../seed/seed-data";
-import type { persistedstate } from "../types";
+import { persistedStateSchema } from "../lib/validation";
+import { createSeedState } from "../seed/seed-data";
+import type { PersistedState } from "../types";
 
-const storagekey = "budget-mvp";
+const STORAGE_KEY = "budget-mvp";
 
-export function loadpersistedstate(): persistedstate | null {
+export function loadPersistedState(): PersistedState | null {
   try {
-    const raw = localStorage.getItem(storagekey);
+    const raw = localStorage.getItem(STORAGE_KEY);
 
     if (!raw) {
       return null;
     }
 
     const parsed = JSON.parse(raw);
-    const result = persistedstateschema.safeParse(parsed);
+    const result = persistedStateSchema.safeParse(parsed);
 
     if (!result.success) {
       console.warn("invalid persisted state, ignoring local data", {
@@ -29,8 +29,8 @@ export function loadpersistedstate(): persistedstate | null {
   }
 }
 
-export function savepersistedstate(state: persistedstate): void {
-  const result = persistedstateschema.safeParse(state);
+export function savePersistedState(state: PersistedState): void {
+  const result = persistedStateSchema.safeParse(state);
 
   if (!result.success) {
     console.warn("refusing to save invalid persisted state", {
@@ -39,21 +39,21 @@ export function savepersistedstate(state: persistedstate): void {
     return;
   }
 
-  localStorage.setItem(storagekey, JSON.stringify(result.data));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(result.data));
 }
 
-export function clearpersistedstate(): void {
-  localStorage.removeItem(storagekey);
+export function clearPersistedState(): void {
+  localStorage.removeItem(STORAGE_KEY);
 }
 
-export function loadorcreatepersistedstate(): persistedstate {
-  const existing = loadpersistedstate();
+export function loadOrCreatePersistedState(): PersistedState {
+  const existing = loadPersistedState();
 
   if (existing) {
     return existing;
   }
 
-  const seeded = createseedstate();
-  savepersistedstate(seeded);
+  const seeded = createSeedState();
+  savePersistedState(seeded);
   return seeded;
 }

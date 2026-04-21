@@ -1,90 +1,90 @@
 import type {
-  account,
-  budget,
-  category,
-  persistedstate,
-  recurringrule,
-  transaction,
+  Account,
+  Budget,
+  Category,
+  PersistedState,
+  RecurringRule,
+  Transaction,
 } from "../types";
 
-const timestamp = "2026-04-01T00:00:00.000Z";
+const SEED_TIMESTAMP = "2026-04-01T00:00:00.000Z";
 
-export const seedaccounts: account[] = [
+export const seedAccounts: Account[] = [
   {
     id: "acct-checking",
     name: "checking",
     type: "checking",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "acct-savings",
     name: "savings",
     type: "savings",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "acct-credit",
     name: "credit card",
     type: "credit",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
 ];
 
-export const seedcategories: category[] = [
+export const seedCategories: Category[] = [
   {
     id: "cat-salary",
     name: "salary",
     kind: "income",
     color: "#16a34a",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "cat-rent",
     name: "rent",
     kind: "expense",
     color: "#dc2626",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "cat-groceries",
     name: "groceries",
     kind: "expense",
     color: "#2563eb",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "cat-dining",
     name: "dining",
     kind: "expense",
     color: "#f97316",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "cat-utilities",
     name: "utilities",
     kind: "expense",
     color: "#7c3aed",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "cat-fun",
     name: "fun",
     kind: "expense",
     color: "#db2777",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
 ];
 
-export const seedrecurringrules: recurringrule[] = [
+export const seedRecurringRules: RecurringRule[] = [
   {
     id: "rule-rent",
     name: "rent",
@@ -96,8 +96,8 @@ export const seedrecurringrules: recurringrule[] = [
     startDate: "2026-04-01",
     active: true,
     dayOfMonth: 1,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "rule-paycheck",
@@ -110,8 +110,8 @@ export const seedrecurringrules: recurringrule[] = [
     startDate: "2026-04-03",
     active: true,
     dayOfWeek: 5,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "rule-streaming",
@@ -124,12 +124,12 @@ export const seedrecurringrules: recurringrule[] = [
     startDate: "2026-04-12",
     active: true,
     dayOfMonth: 12,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
 ];
 
-export const seedtransactions: transaction[] = [
+export const seedTransactions: Transaction[] = [
   {
     id: "txn-rent-2026-04-01",
     date: "2026-04-01",
@@ -139,8 +139,8 @@ export const seedtransactions: transaction[] = [
     merchant: "landlord",
     source: "recurring",
     recurringRuleId: "rule-rent",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "txn-paycheck-2026-04-03",
@@ -151,8 +151,8 @@ export const seedtransactions: transaction[] = [
     merchant: "employer inc",
     source: "recurring",
     recurringRuleId: "rule-paycheck",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "txn-groceries-2026-04-05",
@@ -163,8 +163,8 @@ export const seedtransactions: transaction[] = [
     merchant: "whole paycheck",
     note: "weekly groceries",
     source: "manual",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "txn-dining-2026-04-08",
@@ -174,8 +174,8 @@ export const seedtransactions: transaction[] = [
     categoryId: "cat-dining",
     merchant: "noodle place",
     source: "manual",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "txn-utilities-2026-04-10",
@@ -185,70 +185,70 @@ export const seedtransactions: transaction[] = [
     categoryId: "cat-utilities",
     merchant: "power company",
     source: "manual",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
 ];
 
-export const seedbudgets: budget[] = [
+export const seedBudgets: Budget[] = [
   {
     id: "budget-rent-2026-04",
     month: "2026-04",
     categoryId: "cat-rent",
     plannedCents: 180000,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "budget-groceries-2026-04",
     month: "2026-04",
     categoryId: "cat-groceries",
     plannedCents: 50000,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "budget-dining-2026-04",
     month: "2026-04",
     categoryId: "cat-dining",
     plannedCents: 20000,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "budget-utilities-2026-04",
     month: "2026-04",
     categoryId: "cat-utilities",
     plannedCents: 15000,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
   {
     id: "budget-fun-2026-04",
     month: "2026-04",
     categoryId: "cat-fun",
     plannedCents: 10000,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
   },
 ];
 
-export const seedstate: persistedstate = {
+export const seedState: PersistedState = {
   version: 1,
-  accounts: seedaccounts,
-  categories: seedcategories,
-  transactions: seedtransactions,
-  budgets: seedbudgets,
-  recurringRules: seedrecurringrules,
+  accounts: seedAccounts,
+  categories: seedCategories,
+  transactions: seedTransactions,
+  budgets: seedBudgets,
+  recurringRules: seedRecurringRules,
 };
 
-export function createseedstate(): persistedstate {
+export function createSeedState(): PersistedState {
   return {
     version: 1,
-    accounts: seedaccounts.map((item) => ({ ...item })),
-    categories: seedcategories.map((item) => ({ ...item })),
-    transactions: seedtransactions.map((item) => ({ ...item })),
-    budgets: seedbudgets.map((item) => ({ ...item })),
-    recurringRules: seedrecurringrules.map((item) => ({ ...item })),
+    accounts: seedAccounts.map((item) => ({ ...item })),
+    categories: seedCategories.map((item) => ({ ...item })),
+    transactions: seedTransactions.map((item) => ({ ...item })),
+    budgets: seedBudgets.map((item) => ({ ...item })),
+    recurringRules: seedRecurringRules.map((item) => ({ ...item })),
   };
 }

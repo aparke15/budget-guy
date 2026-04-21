@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { useappstore } from "../../app/store";
-import { getcurrentmonth } from "../../lib/dates";
-import { formatcents, getbudgetrows, getmonthlysummary } from "../../lib/money";
+import { useAppStore } from "../../app/store";
+import { getCurrentMonth } from "../../lib/dates";
+import { formatCents, getBudgetRows, getMonthlySummary } from "../../lib/money";
 
 function Card(props: {
   title: string;
@@ -41,27 +41,27 @@ function Card(props: {
 }
 
 export function DashboardPage() {
-  const [month, setMonth] = useState(getcurrentmonth());
+  const [month, setMonth] = useState(getCurrentMonth());
 
-  const transactions = useappstore((state) => state.transactions);
-  const budgets = useappstore((state) => state.budgets);
-  const categories = useappstore((state) => state.categories);
-  const generaterecurringformonth = useappstore(
-    (state) => state.generaterecurringformonth
+  const transactions = useAppStore((state) => state.transactions);
+  const budgets = useAppStore((state) => state.budgets);
+  const categories = useAppStore((state) => state.categories);
+  const generateRecurringForMonth = useAppStore(
+    (state) => state.generateRecurringForMonth
   );
 
   const summary = useMemo(
-    () => getmonthlysummary(transactions, budgets, month),
+    () => getMonthlySummary(transactions, budgets, month),
     [budgets, month, transactions]
   );
 
-  const budgetrows = useMemo(
-    () => getbudgetrows(categories, budgets, transactions, month),
+  const budgetRows = useMemo(
+    () => getBudgetRows(categories, budgets, transactions, month),
     [budgets, categories, month, transactions]
   );
 
-  const overbudget = budgetrows.filter((row) => row.overBudget);
-  const recenttransactions = transactions.slice(0, 8);
+  const overBudget = budgetRows.filter((row) => row.overBudget);
+  const recentTransactions = transactions.slice(0, 8);
 
   return (
     <section style={{ display: "grid", gap: "1.25rem" }}>
@@ -106,7 +106,7 @@ export function DashboardPage() {
 
           <button
             type="button"
-            onClick={() => generaterecurringformonth(month)}
+            onClick={() => generateRecurringForMonth(month)}
             style={{
               padding: "0.7rem 0.95rem",
               borderRadius: "0.5rem",
@@ -128,16 +128,16 @@ export function DashboardPage() {
           gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
         }}
       >
-        <Card title="income" value={formatcents(summary.incomeCents)} />
-        <Card title="expenses" value={formatcents(summary.expenseCents)} />
+        <Card title="income" value={formatCents(summary.incomeCents)} />
+        <Card title="expenses" value={formatCents(summary.expenseCents)} />
         <Card
           title="net"
-          value={formatcents(summary.netCents)}
+          value={formatCents(summary.netCents)}
           tone={summary.netCents >= 0 ? "good" : "bad"}
         />
         <Card
           title="unassigned"
-          value={formatcents(summary.unassignedCents)}
+          value={formatCents(summary.unassignedCents)}
           tone={summary.unassignedCents >= 0 ? "default" : "bad"}
         />
       </div>
@@ -159,15 +159,15 @@ export function DashboardPage() {
         >
           <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>over budget</h2>
 
-          {overbudget.length === 0 ? (
+          {overBudget.length === 0 ? (
             <p style={{ color: "#166534", marginBottom: 0 }}>
               shocking restraint. nothing over budget this month.
             </p>
           ) : (
             <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-              {overbudget.map((row) => (
+              {overBudget.map((row) => (
                 <li key={row.categoryId} style={{ marginBottom: "0.4rem" }}>
-                  {row.categoryName}: {formatcents(Math.abs(row.remainingCents))}{" "}
+                  {row.categoryName}: {formatCents(Math.abs(row.remainingCents))}{" "}
                   over
                 </li>
               ))}
@@ -188,10 +188,10 @@ export function DashboardPage() {
           </h2>
 
           <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-            {budgetrows.slice(0, 5).map((row) => (
+            {budgetRows.slice(0, 5).map((row) => (
               <li key={row.categoryId} style={{ marginBottom: "0.4rem" }}>
-                {row.categoryName}: {formatcents(row.actualCents)} spent /{" "}
-                {formatcents(row.plannedCents)} planned
+                {row.categoryName}: {formatCents(row.actualCents)} spent /{" "}
+                {formatCents(row.plannedCents)} planned
               </li>
             ))}
           </ul>
@@ -224,7 +224,7 @@ export function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {recenttransactions.map((transaction) => (
+              {recentTransactions.map((transaction) => (
                 <tr
                   key={transaction.id}
                   style={{ borderBottom: "1px solid #f3f4f6" }}
@@ -246,7 +246,7 @@ export function DashboardPage() {
                       fontWeight: 600,
                     }}
                   >
-                    {formatcents(transaction.amountCents)}
+                    {formatCents(transaction.amountCents)}
                   </td>
                 </tr>
               ))}

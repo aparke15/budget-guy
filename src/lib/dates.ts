@@ -13,51 +13,51 @@ import {
 } from "date-fns";
 
 import type {
-  generatedrecurringoccurrence,
-  recurringrule,
-  transaction,
+  GeneratedRecurringOccurrence,
+  RecurringRule,
+  Transaction,
 } from "../types";
 
-export function getmonthkey(date: string): string {
+export function getMonthKey(date: string): string {
   return date.slice(0, 7);
 }
 
-export function getcurrentmonth(): string {
+export function getCurrentMonth(): string {
   return format(new Date(), "yyyy-MM");
 }
 
-export function getnowiso(): string {
+export function getNowIso(): string {
   return new Date().toISOString();
 }
 
-export function getmonthlyoccurrencedate(
+export function getMonthlyOccurrenceDate(
   month: string,
-  dayofmonth: number
+  dayOfMonth: number
 ): string {
-  const monthstart = parseISO(`${month}-01`);
-  const maxday = getDaysInMonth(monthstart);
-  const safeday = Math.min(dayofmonth, maxday);
-  const candidate = new Date(monthstart);
+  const monthStart = parseISO(`${month}-01`);
+  const maxDay = getDaysInMonth(monthStart);
+  const safeDay = Math.min(dayOfMonth, maxDay);
+  const candidate = new Date(monthStart);
 
-  candidate.setDate(safeday);
+  candidate.setDate(safeDay);
 
   return format(candidate, "yyyy-MM-dd");
 }
 
-export function isdatewithinbounds(
+export function isDateWithinBounds(
   date: string,
-  startdate: string,
-  enddate?: string
+  startDate: string,
+  endDate?: string
 ): boolean {
   const candidate = parseISO(date);
-  const start = parseISO(startdate);
+  const start = parseISO(startDate);
 
   if (isBefore(candidate, start)) {
     return false;
   }
 
-  if (enddate) {
-    const end = parseISO(enddate);
+  if (endDate) {
+    const end = parseISO(endDate);
 
     if (isAfter(candidate, end)) {
       return false;
@@ -67,42 +67,42 @@ export function isdatewithinbounds(
   return true;
 }
 
-export function getfirstweekdayonorafter(
-  startdate: string,
-  dayofweek: number
+export function getFirstWeekdayOnOrAfter(
+  startDate: string,
+  dayOfWeek: number
 ): string {
-  let candidate = parseISO(startdate);
+  let candidate = parseISO(startDate);
 
-  while (getDay(candidate) !== dayofweek) {
+  while (getDay(candidate) !== dayOfWeek) {
     candidate = addDays(candidate, 1);
   }
 
   return format(candidate, "yyyy-MM-dd");
 }
 
-export function generateoccurrencesformonth(
-  rule: recurringrule,
+export function generateOccurrencesForMonth(
+  rule: RecurringRule,
   month: string,
-  transactions: transaction[]
-): generatedrecurringoccurrence[] {
+  transactions: Transaction[]
+): GeneratedRecurringOccurrence[] {
   if (!rule.active) {
     return [];
   }
 
-  const existingdates = new Set(
+  const existingDates = new Set(
     transactions
       .filter((transaction) => transaction.recurringRuleId === rule.id)
       .map((transaction) => transaction.date)
   );
 
-  const occurrences: generatedrecurringoccurrence[] = [];
+  const occurrences: GeneratedRecurringOccurrence[] = [];
 
   if (rule.frequency === "monthly") {
-    const date = getmonthlyoccurrencedate(month, rule.dayOfMonth!);
+    const date = getMonthlyOccurrenceDate(month, rule.dayOfMonth!);
 
     if (
-      isdatewithinbounds(date, rule.startDate, rule.endDate) &&
-      !existingdates.has(date)
+      isDateWithinBounds(date, rule.startDate, rule.endDate) &&
+      !existingDates.has(date)
     ) {
       occurrences.push({
         recurringRuleId: rule.id,
@@ -118,35 +118,35 @@ export function generateoccurrencesformonth(
     return occurrences;
   }
 
-  const monthstart = startOfMonth(parseISO(`${month}-01`));
-  const monthend = endOfMonth(monthstart);
-  const anchordate = parseISO(
-    getfirstweekdayonorafter(rule.startDate, rule.dayOfWeek!)
+  const monthStart = startOfMonth(parseISO(`${month}-01`));
+  const monthEnd = endOfMonth(monthStart);
+  const anchorDate = parseISO(
+    getFirstWeekdayOnOrAfter(rule.startDate, rule.dayOfWeek!)
   );
-  const intervaldays = rule.frequency === "weekly" ? 7 : 14;
+  const intervalDays = rule.frequency === "weekly" ? 7 : 14;
 
-  for (const day of eachDayOfInterval({ start: monthstart, end: monthend })) {
+  for (const day of eachDayOfInterval({ start: monthStart, end: monthEnd })) {
     if (getDay(day) !== rule.dayOfWeek) {
       continue;
     }
 
-    if (isBefore(day, anchordate)) {
+    if (isBefore(day, anchorDate)) {
       continue;
     }
 
-    const diffdays = differenceInCalendarDays(day, anchordate);
+    const diffDays = differenceInCalendarDays(day, anchorDate);
 
-    if (diffdays % intervaldays !== 0) {
+    if (diffDays % intervalDays !== 0) {
       continue;
     }
 
     const date = format(day, "yyyy-MM-dd");
 
-    if (!isdatewithinbounds(date, rule.startDate, rule.endDate)) {
+    if (!isDateWithinBounds(date, rule.startDate, rule.endDate)) {
       continue;
     }
 
-    if (existingdates.has(date)) {
+    if (existingDates.has(date)) {
       continue;
     }
 

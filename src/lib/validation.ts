@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const accountschema = z.object({
+export const accountSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   type: z.enum(["checking", "savings", "credit", "cash"]),
@@ -8,7 +8,7 @@ export const accountschema = z.object({
   updatedAt: z.string().datetime(),
 });
 
-export const categoryschema = z.object({
+export const categorySchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   kind: z.enum(["income", "expense"]),
@@ -17,7 +17,7 @@ export const categoryschema = z.object({
   updatedAt: z.string().datetime(),
 });
 
-export const transactionschema = z.object({
+export const transactionSchema = z.object({
   id: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   amountCents: z.number().int(),
@@ -31,7 +31,7 @@ export const transactionschema = z.object({
   updatedAt: z.string().datetime(),
 });
 
-export const budgetschema = z.object({
+export const budgetSchema = z.object({
   id: z.string().min(1),
   month: z.string().regex(/^\d{4}-\d{2}$/),
   categoryId: z.string().min(1),
@@ -40,7 +40,7 @@ export const budgetschema = z.object({
   updatedAt: z.string().datetime(),
 });
 
-export const recurringruleschema = z
+export const recurringRuleSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
@@ -79,20 +79,18 @@ export const recurringruleschema = z
     }
   });
 
-export const persistedstateschema = z.object({
+export const persistedStateSchema = z.object({
   version: z.literal(1),
-  accounts: z.array(accountschema),
-  categories: z.array(categoryschema),
-  transactions: z.array(transactionschema),
-  budgets: z.array(budgetschema),
-  recurringRules: z.array(recurringruleschema),
+  accounts: z.array(accountSchema),
+  categories: z.array(categorySchema),
+  transactions: z.array(transactionSchema),
+  budgets: z.array(budgetSchema),
+  recurringRules: z.array(recurringRuleSchema),
 });
 
-export type accountschematype = z.infer<typeof accountschema>;
-export type categoryschematype = z.infer<typeof categoryschema>;
-export type transactionschematype = z.infer<typeof transactionschema>;
-export type budgetschematype = z.infer<typeof budgetschema>;
-export type recurringruleschematype = z.infer<typeof recurringruleschema>;
-export type persistedstateschematype = z.infer<
-  typeof persistedstateschema
->;
+export type AccountSchemaType = z.infer<typeof accountSchema>;
+export type CategorySchemaType = z.infer<typeof categorySchema>;
+export type TransactionSchemaType = z.infer<typeof transactionSchema>;
+export type BudgetSchemaType = z.infer<typeof budgetSchema>;
+export type RecurringRuleSchemaType = z.infer<typeof recurringRuleSchema>;
+export type PersistedStateSchemaType = z.infer<typeof persistedStateSchema>;

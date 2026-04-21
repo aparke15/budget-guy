@@ -1,27 +1,27 @@
-export type accounttype = "checking" | "savings" | "credit" | "cash";
+export type AccountType = "checking" | "savings" | "credit" | "cash";
 
-export type categorykind = "income" | "expense";
+export type CategoryKind = "income" | "expense";
 
-export type recurringfrequency = "monthly" | "weekly" | "biweekly";
+export type RecurringFrequency = "monthly" | "weekly" | "biweekly";
 
-export type account = {
+export type Account = {
   id: string;
   name: string;
-  type: accounttype;
+  type: AccountType;
   createdAt: string;
   updatedAt: string;
 };
 
-export type category = {
+export type Category = {
   id: string;
   name: string;
-  kind: categorykind;
+  kind: CategoryKind;
   color?: string;
   createdAt: string;
   updatedAt: string;
 };
 
-export type transaction = {
+export type Transaction = {
   id: string;
   date: string; // yyyy-mm-dd
   amountCents: number; // positive = income, negative = expense
@@ -35,7 +35,7 @@ export type transaction = {
   updatedAt: string;
 };
 
-export type budget = {
+export type Budget = {
   id: string;
   month: string; // yyyy-mm
   categoryId: string;
@@ -44,7 +44,7 @@ export type budget = {
   updatedAt: string;
 };
 
-export type recurringrule = {
+export type RecurringRule = {
   id: string;
   name: string;
   amountCents: number; // positive = income, negative = expense
@@ -52,7 +52,7 @@ export type recurringrule = {
   categoryId: string;
   merchant?: string;
   note?: string;
-  frequency: recurringfrequency;
+  frequency: RecurringFrequency;
   startDate: string; // yyyy-mm-dd
   endDate?: string; // yyyy-mm-dd
   active: boolean;
@@ -62,7 +62,7 @@ export type recurringrule = {
   updatedAt: string;
 };
 
-export type budgetrow = {
+export type BudgetRow = {
   categoryId: string;
   categoryName: string;
   plannedCents: number;
@@ -71,7 +71,7 @@ export type budgetrow = {
   overBudget: boolean;
 };
 
-export type monthlysummary = {
+export type MonthlySummary = {
   incomeCents: number;
   expenseCents: number;
   netCents: number;
@@ -79,7 +79,7 @@ export type monthlysummary = {
   unassignedCents: number;
 };
 
-export type generatedrecurringoccurrence = {
+export type GeneratedRecurringOccurrence = {
   recurringRuleId: string;
   date: string;
   amountCents: number;
@@ -89,11 +89,11 @@ export type generatedrecurringoccurrence = {
   note?: string;
 };
 
-export type persistedstate = {
+export type PersistedState = {
   version: 1;
-  accounts: account[];
-  categories: category[];
-  transactions: transaction[];
-  budgets: budget[];
-  recurringRules: recurringrule[];
+  accounts: Account[];
+  categories: Category[];
+  transactions: Transaction[];
+  budgets: Budget[];
+  recurringRules: RecurringRule[];
 };

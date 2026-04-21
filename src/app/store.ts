@@ -1,63 +1,63 @@
 import { create } from "zustand";
 
-import { generateoccurrencesformonth, getnowiso } from "../lib/dates";
-import { createseedstate } from "../seed/seed-data";
+import { generateOccurrencesForMonth, getNowIso } from "../lib/dates";
+import { createSeedState } from "../seed/seed-data";
 import type {
-  account,
-  budget,
-  category,
-  persistedstate,
-  recurringrule,
-  transaction,
+  Account,
+  Budget,
+  Category,
+  PersistedState,
+  RecurringRule,
+  Transaction,
 } from "../types";
-import { loadorcreatepersistedstate, savepersistedstate } from "./storage";
+import { loadOrCreatePersistedState, savePersistedState } from "./storage";
 
-type appstate = {
-  accounts: account[];
-  categories: category[];
-  transactions: transaction[];
-  budgets: budget[];
-  recurringRules: recurringrule[];
+type AppState = {
+  accounts: Account[];
+  categories: Category[];
+  transactions: Transaction[];
+  budgets: Budget[];
+  recurringRules: RecurringRule[];
 
-  addaccount: (input: account) => void;
-  updateaccount: (id: string, input: Partial<account>) => void;
-  deleteaccount: (id: string) => void;
+  addAccount: (input: Account) => void;
+  updateAccount: (id: string, input: Partial<Account>) => void;
+  deleteAccount: (id: string) => void;
 
-  addcategory: (input: category) => void;
-  updatecategory: (id: string, input: Partial<category>) => void;
-  deletecategory: (id: string) => void;
+  addCategory: (input: Category) => void;
+  updateCategory: (id: string, input: Partial<Category>) => void;
+  deleteCategory: (id: string) => void;
 
-  addtransaction: (input: transaction) => void;
-  updatetransaction: (id: string, input: Partial<transaction>) => void;
-  deletetransaction: (id: string) => void;
+  addTransaction: (input: Transaction) => void;
+  updateTransaction: (id: string, input: Partial<Transaction>) => void;
+  deleteTransaction: (id: string) => void;
 
-  addbudget: (input: budget) => void;
-  updatebudget: (id: string, input: Partial<budget>) => void;
-  deletebudget: (id: string) => void;
+  addBudget: (input: Budget) => void;
+  updateBudget: (id: string, input: Partial<Budget>) => void;
+  deleteBudget: (id: string) => void;
 
-  addrecurringrule: (input: recurringrule) => void;
-  updaterecurringrule: (id: string, input: Partial<recurringrule>) => void;
-  deleterecurringrule: (id: string) => void;
+  addRecurringRule: (input: RecurringRule) => void;
+  updateRecurringRule: (id: string, input: Partial<RecurringRule>) => void;
+  deleteRecurringRule: (id: string) => void;
 
-  generaterecurringformonth: (month: string) => void;
-  resetseeddata: () => void;
+  generateRecurringForMonth: (month: string) => void;
+  resetSeedData: () => void;
 };
 
-type datastate = {
-  accounts: account[];
-  categories: category[];
-  transactions: transaction[];
-  budgets: budget[];
-  recurringRules: recurringrule[];
+type DataState = {
+  accounts: Account[];
+  categories: Category[];
+  transactions: Transaction[];
+  budgets: Budget[];
+  recurringRules: RecurringRule[];
 };
 
-const initialdata = loadorcreatepersistedstate();
+const initialData = loadOrCreatePersistedState();
 
-function sorttransactions(transactions: transaction[]): transaction[] {
+function sortTransactions(transactions: Transaction[]): Transaction[] {
   return [...transactions].sort((a, b) => b.date.localeCompare(a.date));
 }
 
-function buildpersistedstate(state: datastate): persistedstate {
+function buildPersistedState(state: DataState): PersistedState {
   return {
     version: 1,
     accounts: state.accounts,
@@ -68,142 +68,142 @@ function buildpersistedstate(state: datastate): persistedstate {
   };
 }
 
-export const useappstore = create<appstate>((set) => ({
-  accounts: initialdata.accounts,
-  categories: initialdata.categories,
-  transactions: sorttransactions(initialdata.transactions),
-  budgets: initialdata.budgets,
-  recurringRules: initialdata.recurringRules,
+export const useAppStore = create<AppState>((set) => ({
+  accounts: initialData.accounts,
+  categories: initialData.categories,
+  transactions: sortTransactions(initialData.transactions),
+  budgets: initialData.budgets,
+  recurringRules: initialData.recurringRules,
 
-  addaccount: (input) =>
+  addAccount: (input) =>
     set((state) => ({
       accounts: [...state.accounts, input],
     })),
 
-  updateaccount: (id, input) =>
+  updateAccount: (id, input) =>
     set((state) => ({
       accounts: state.accounts.map((account) =>
         account.id === id
           ? {
               ...account,
               ...input,
-              updatedAt: getnowiso(),
+              updatedAt: getNowIso(),
             }
           : account
       ),
     })),
 
-  deleteaccount: (id) =>
+  deleteAccount: (id) =>
     set((state) => ({
       accounts: state.accounts.filter((account) => account.id !== id),
     })),
 
-  addcategory: (input) =>
+  addCategory: (input) =>
     set((state) => ({
       categories: [...state.categories, input],
     })),
 
-  updatecategory: (id, input) =>
+  updateCategory: (id, input) =>
     set((state) => ({
       categories: state.categories.map((category) =>
         category.id === id
           ? {
               ...category,
               ...input,
-              updatedAt: getnowiso(),
+              updatedAt: getNowIso(),
             }
           : category
       ),
     })),
 
-  deletecategory: (id) =>
+  deleteCategory: (id) =>
     set((state) => ({
       categories: state.categories.filter((category) => category.id !== id),
     })),
 
-  addtransaction: (input) =>
+  addTransaction: (input) =>
     set((state) => ({
-      transactions: sorttransactions([...state.transactions, input]),
+      transactions: sortTransactions([...state.transactions, input]),
     })),
 
-  updatetransaction: (id, input) =>
+  updateTransaction: (id, input) =>
     set((state) => ({
-      transactions: sorttransactions(
+      transactions: sortTransactions(
         state.transactions.map((transaction) =>
           transaction.id === id
             ? {
                 ...transaction,
                 ...input,
-                updatedAt: getnowiso(),
+                updatedAt: getNowIso(),
               }
             : transaction
         )
       ),
     })),
 
-  deletetransaction: (id) =>
+  deleteTransaction: (id) =>
     set((state) => ({
       transactions: state.transactions.filter(
         (transaction) => transaction.id !== id
       ),
     })),
 
-  addbudget: (input) =>
+  addBudget: (input) =>
     set((state) => ({
       budgets: [...state.budgets, input],
     })),
 
-  updatebudget: (id, input) =>
+  updateBudget: (id, input) =>
     set((state) => ({
       budgets: state.budgets.map((budget) =>
         budget.id === id
           ? {
               ...budget,
               ...input,
-              updatedAt: getnowiso(),
+              updatedAt: getNowIso(),
             }
           : budget
       ),
     })),
 
-  deletebudget: (id) =>
+  deleteBudget: (id) =>
     set((state) => ({
       budgets: state.budgets.filter((budget) => budget.id !== id),
     })),
 
-  addrecurringrule: (input) =>
+  addRecurringRule: (input) =>
     set((state) => ({
       recurringRules: [...state.recurringRules, input],
     })),
 
-  updaterecurringrule: (id, input) =>
+  updateRecurringRule: (id, input) =>
     set((state) => ({
       recurringRules: state.recurringRules.map((rule) =>
         rule.id === id
           ? {
               ...rule,
               ...input,
-              updatedAt: getnowiso(),
+              updatedAt: getNowIso(),
             }
           : rule
       ),
     })),
 
-  deleterecurringrule: (id) =>
+  deleteRecurringRule: (id) =>
     set((state) => ({
       recurringRules: state.recurringRules.filter((rule) => rule.id !== id),
     })),
 
-  generaterecurringformonth: (month) =>
+  generateRecurringForMonth: (month) =>
     set((state) => {
-      const now = getnowiso();
+      const now = getNowIso();
 
-      const generatedtransactions = state.recurringRules
+      const generatedTransactions = state.recurringRules
         .filter((rule) => rule.active)
         .flatMap((rule) =>
-          generateoccurrencesformonth(rule, month, state.transactions)
+          generateOccurrencesForMonth(rule, month, state.transactions)
         )
-        .map<transaction>((occurrence) => ({
+        .map<Transaction>((occurrence) => ({
           id: crypto.randomUUID(),
           date: occurrence.date,
           amountCents: occurrence.amountCents,
@@ -217,34 +217,34 @@ export const useappstore = create<appstate>((set) => ({
           updatedAt: now,
         }));
 
-      if (generatedtransactions.length === 0) {
+      if (generatedTransactions.length === 0) {
         return {};
       }
 
       return {
-        transactions: sorttransactions([
+        transactions: sortTransactions([
           ...state.transactions,
-          ...generatedtransactions,
+          ...generatedTransactions,
         ]),
       };
     }),
 
-  resetseeddata: () => {
-    const seeded = createseedstate();
+  resetSeedData: () => {
+    const seeded = createSeedState();
 
     set({
       accounts: seeded.accounts,
       categories: seeded.categories,
-      transactions: sorttransactions(seeded.transactions),
+      transactions: sortTransactions(seeded.transactions),
       budgets: seeded.budgets,
       recurringRules: seeded.recurringRules,
     });
   },
 }));
 
-useappstore.subscribe((state) => {
-  savepersistedstate(
-    buildpersistedstate({
+useAppStore.subscribe((state) => {
+  savePersistedState(
+    buildPersistedState({
       accounts: state.accounts,
       categories: state.categories,
       transactions: state.transactions,

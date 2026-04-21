@@ -1,71 +1,91 @@
 import type {
-  budget,
-  budgetrow,
-  category,
-  monthlysummary,
-  transaction,
+  Budget,
+  BudgetRow,
+  Category,
+  MonthlySummary,
+  Transaction,
 } from "../types";
-import { getmonthkey } from "./dates";
+import { getMonthKey } from "./dates";
 
-export function formatcents(
-  amountcents: number,
+export function formatCents(
+  amountCents: number,
   locale = "en-US",
   currency = "USD"
 ): string {
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
-  }).format(amountcents / 100);
+  }).format(amountCents / 100);
 }
 
-export function sumincomecents(
-  transactions: transaction[],
+export function formatCentsForInput(amountCents: number): string {
+  return (Math.abs(amountCents) / 100).toFixed(2);
+}
+
+export function parseAmountInputToCents(input: string): number | null {
+  const normalized = input.replace(/[$,\s]/g, "").trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const value = Number(normalized);
+
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.round(value * 100);
+}
+
+export function sumIncomeCents(
+  transactions: Transaction[],
   month: string
 ): number {
   return transactions
     .filter(
       (transaction) =>
-        getmonthkey(transaction.date) === month &&
+        getMonthKey(transaction.date) === month &&
         transaction.amountCents > 0
     )
     .reduce((sum, transaction) => sum + transaction.amountCents, 0);
 }
 
-export function sumexpensecents(
-  transactions: transaction[],
+export function sumExpenseCents(
+  transactions: Transaction[],
   month: string
 ): number {
   return transactions
     .filter(
       (transaction) =>
-        getmonthkey(transaction.date) === month &&
+        getMonthKey(transaction.date) === month &&
         transaction.amountCents < 0
     )
     .reduce((sum, transaction) => sum + Math.abs(transaction.amountCents), 0);
 }
 
-export function sumcategoryactualcents(
-  transactions: transaction[],
+export function sumCategoryActualCents(
+  transactions: Transaction[],
   month: string,
-  categoryid: string
+  categoryId: string
 ): number {
   return transactions
     .filter(
       (transaction) =>
-        getmonthkey(transaction.date) === month &&
-        transaction.categoryId === categoryid &&
+        getMonthKey(transaction.date) === month &&
+        transaction.categoryId === categoryId &&
         transaction.amountCents < 0
     )
     .reduce((sum, transaction) => sum + Math.abs(transaction.amountCents), 0);
 }
 
-export function getmonthlysummary(
-  transactions: transaction[],
-  budgets: budget[],
+export function getMonthlySummary(
+  transactions: Transaction[],
+  budgets: Budget[],
   month: string
-): monthlysummary {
-  const incomeCents = sumincomecents(transactions, month);
-  const expenseCents = sumexpensecents(transactions, month);
+): MonthlySummary {
+  const incomeCents = sumIncomeCents(transactions, month);
+  const expenseCents = sumExpenseCents(transactions, month);
   const plannedCents = budgets
     .filter((budget) => budget.month === month)
     .reduce((sum, budget) => sum + budget.plannedCents, 0);
@@ -79,13 +99,13 @@ export function getmonthlysummary(
   };
 }
 
-export function getbudgetrows(
-  categories: category[],
-  budgets: budget[],
-  transactions: transaction[],
+export function getBudgetRows(
+  categories: Category[],
+  budgets: Budget[],
+  transactions: Transaction[],
   month: string
-): budgetrow[] {
-  const budgetmap = budgets
+): BudgetRow[] {
+  const budgetMap = budgets
     .filter((budget) => budget.month === month)
     .reduce<Record<string, number>>((acc, budget) => {
       acc[budget.categoryId] = budget.plannedCents;
@@ -95,8 +115,8 @@ export function getbudgetrows(
   return categories
     .filter((category) => category.kind === "expense")
     .map((category) => {
-      const plannedCents = budgetmap[category.id] ?? 0;
-      const actualCents = sumcategoryactualcents(
+      const plannedCents = budgetMap[category.id] ?? 0;
+      const actualCents = sumCategoryActualCents(
         transactions,
         month,
         category.id
