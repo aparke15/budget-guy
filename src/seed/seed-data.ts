@@ -87,6 +87,7 @@ export const seedCategories: Category[] = [
 export const seedRecurringRules: RecurringRule[] = [
   {
     id: "rule-rent",
+    kind: "standard",
     name: "rent",
     amountCents: -180000,
     accountId: "acct-checking",
@@ -101,6 +102,7 @@ export const seedRecurringRules: RecurringRule[] = [
   },
   {
     id: "rule-paycheck",
+    kind: "standard",
     name: "paycheck",
     amountCents: 250000,
     accountId: "acct-checking",
@@ -115,6 +117,7 @@ export const seedRecurringRules: RecurringRule[] = [
   },
   {
     id: "rule-streaming",
+    kind: "standard",
     name: "streaming",
     amountCents: -1599,
     accountId: "acct-credit",
@@ -132,6 +135,7 @@ export const seedRecurringRules: RecurringRule[] = [
 export const seedTransactions: Transaction[] = [
   {
     id: "txn-rent-2026-04-01",
+    kind: "standard",
     date: "2026-04-01",
     amountCents: -180000,
     accountId: "acct-checking",
@@ -144,6 +148,7 @@ export const seedTransactions: Transaction[] = [
   },
   {
     id: "txn-paycheck-2026-04-03",
+    kind: "standard",
     date: "2026-04-03",
     amountCents: 250000,
     accountId: "acct-checking",
@@ -156,6 +161,7 @@ export const seedTransactions: Transaction[] = [
   },
   {
     id: "txn-groceries-2026-04-05",
+    kind: "standard",
     date: "2026-04-05",
     amountCents: -12450,
     accountId: "acct-checking",
@@ -168,6 +174,7 @@ export const seedTransactions: Transaction[] = [
   },
   {
     id: "txn-dining-2026-04-08",
+    kind: "standard",
     date: "2026-04-08",
     amountCents: -4280,
     accountId: "acct-credit",
@@ -179,6 +186,7 @@ export const seedTransactions: Transaction[] = [
   },
   {
     id: "txn-utilities-2026-04-10",
+    kind: "standard",
     date: "2026-04-10",
     amountCents: -8750,
     accountId: "acct-checking",

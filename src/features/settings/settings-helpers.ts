@@ -1,4 +1,6 @@
-import type { Budget, RecurringRule, Transaction } from "../../types";
+import { formatSignedCentsForInput, parseAmountInputToCents } from "../../lib/money";
+import type { AccountFormValues } from "../types";
+import type { Account, Budget, RecurringRule, Transaction } from "../../types";
 
 export type PendingDelete =
   | {
@@ -26,6 +28,23 @@ export function normalizeEntityName(name: string): string {
   return name.trim().toLocaleLowerCase();
 }
 
+export function buildDuplicateName(name: string, existingNames: string[]): string {
+  const trimmedName = name.trim();
+  const normalizedNames = new Set(existingNames.map(normalizeEntityName));
+
+  let copyIndex = 1;
+
+  while (true) {
+    const candidate = copyIndex === 1 ? `${trimmedName} copy` : `${trimmedName} copy ${copyIndex}`;
+
+    if (!normalizedNames.has(normalizeEntityName(candidate))) {
+      return candidate;
+    }
+
+    copyIndex += 1;
+  }
+}
+
 export function sortItemsByName<T extends { name: string }>(items: T[]): T[] {
   return [...items].sort((left, right) => left.name.localeCompare(right.name));
 }
@@ -46,6 +65,94 @@ export function countById<T>(
   }, {});
 }
 
+export function countRecurringRulesByAccountId(
+  recurringRules: RecurringRule[]
+): Record<string, number> {
+  return recurringRules.reduce<Record<string, number>>((acc, rule) => {
+    acc[rule.accountId] = (acc[rule.accountId] ?? 0) + 1;
+
+    if (rule.kind === "transfer" && rule.toAccountId) {
+      acc[rule.toAccountId] = (acc[rule.toAccountId] ?? 0) + 1;
+    }
+
+    return acc;
+  }, {});
+}
+
+export function getTodayDateInputValue(today = new Date()): string {
+  return today.toISOString().slice(0, 10);
+}
+
+export function getAccountOpeningBalanceTransaction(
+  transactions: Transaction[],
+  accountId: string
+): Transaction | undefined {
+  return transactions.find(
+    (transaction) =>
+      transaction.accountId === accountId &&
+      transaction.kind === "opening-balance"
+  );
+}
+
+export function createAccountFormValues(
+  account?: Account,
+  openingBalanceTransaction?: Transaction,
+  today = getTodayDateInputValue()
+): AccountFormValues {
+  return {
+    name: account?.name ?? "",
+    type: account?.type ?? "checking",
+    creditLimit:
+      account?.type === "credit" && account.creditLimitCents != null
+        ? formatSignedCentsForInput(account.creditLimitCents)
+        : "",
+    openingBalance: openingBalanceTransaction
+      ? formatSignedCentsForInput(openingBalanceTransaction.amountCents)
+      : "",
+    openingBalanceDate: openingBalanceTransaction?.date ?? today,
+  };
+}
+
+export function parseAccountCreditLimitInput(amount: string): {
+  hasValue: boolean;
+  amountCents: number | null;
+} {
+  const trimmed = amount.trim();
+
+  if (!trimmed) {
+    return {
+      hasValue: false,
+      amountCents: null,
+    };
+  }
+
+  const amountCents = parseAmountInputToCents(trimmed);
+
+  return {
+    hasValue: true,
+    amountCents,
+  };
+}
+
+export function parseAccountOpeningBalanceInput(amount: string): {
+  hasValue: boolean;
+  amountCents: number | null;
+} {
+  const trimmed = amount.trim();
+
+  if (!trimmed) {
+    return {
+      hasValue: false,
+      amountCents: null,
+    };
+  }
+
+  return {
+    hasValue: true,
+    amountCents: parseAmountInputToCents(trimmed),
+  };
+}
+
 export function buildDeleteImpact(
   pendingDelete: PendingDelete | null,
   budgets: Budget[],
@@ -61,7 +168,8 @@ export function buildDeleteImpact(
       (transaction) => transaction.accountId === pendingDelete.id
     ).length;
     const ruleCount = recurringRules.filter(
-      (rule) => rule.accountId === pendingDelete.id
+      (rule) =>
+        rule.accountId === pendingDelete.id || rule.toAccountId === pendingDelete.id
     ).length;
 
     return {

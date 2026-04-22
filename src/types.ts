@@ -2,12 +2,17 @@ export type AccountType = "checking" | "savings" | "credit" | "cash";
 
 export type CategoryKind = "income" | "expense";
 
-export type RecurringFrequency = "monthly" | "weekly" | "biweekly";
+export type TransactionKind = "standard" | "transfer" | "opening-balance";
+
+export type RecurringFrequency = "monthly" | "weekly" | "biweekly" | "yearly";
+
+export type RecurringRuleKind = "standard" | "transfer";
 
 export type Account = {
   id: string;
   name: string;
   type: AccountType;
+  creditLimitCents?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -23,14 +28,16 @@ export type Category = {
 
 export type Transaction = {
   id: string;
+  kind: TransactionKind;
   date: string; // yyyy-mm-dd
-  amountCents: number; // positive = income, negative = expense
+  amountCents: number;
   accountId: string;
-  categoryId: string;
+  categoryId?: string; // required for standard, omitted for transfer/opening-balance
   merchant?: string;
   note?: string;
   source: "manual" | "recurring";
   recurringRuleId?: string;
+  transferGroupId?: string; // required for transfer, absent for standard/opening-balance
   createdAt: string;
   updatedAt: string;
 };
@@ -46,11 +53,13 @@ export type Budget = {
 
 export type RecurringRule = {
   id: string;
+  kind: RecurringRuleKind;
   name: string;
-  amountCents: number; // positive = income, negative = expense
-  accountId: string;
-  categoryId: string;
-  merchant?: string;
+  amountCents: number;
+  accountId: string; // standard: transaction account, transfer: from account
+  toAccountId?: string; // transfer only
+  categoryId?: string; // standard only
+  merchant?: string; // standard only
   note?: string;
   frequency: RecurringFrequency;
   startDate: string; // yyyy-mm-dd
@@ -81,10 +90,12 @@ export type MonthlySummary = {
 
 export type GeneratedRecurringOccurrence = {
   recurringRuleId: string;
+  kind: RecurringRuleKind;
   date: string;
   amountCents: number;
   accountId: string;
-  categoryId: string;
+  toAccountId?: string;
+  categoryId?: string;
   merchant?: string;
   note?: string;
 };

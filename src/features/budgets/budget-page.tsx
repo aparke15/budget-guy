@@ -5,13 +5,15 @@ import { createBudget } from "../../lib/factories";
 import { getCurrentMonth } from "../../lib/dates";
 import {
   createDraftSummary,
+  getAvailableBudgetCategories,
+  getBudgetEditorRows,
   getDraftPlannedTotal,
   getDraftRemainingCents,
+  hasBudgetForMonthCategory,
 } from "./budget-page-helpers";
 import {
   formatCents,
   formatCentsForInput,
-  getBudgetRows,
   getMonthlySummary,
   parseAmountInputToCents,
 } from "../../lib/money";
@@ -19,36 +21,35 @@ import {
 export function BudgetPage() {
   const [month, setMonth] = useState(getCurrentMonth());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [newCategoryId, setNewCategoryId] = useState("");
+  const [newPlannedAmount, setNewPlannedAmount] = useState("");
+  const [addError, setAddError] = useState("");
 
   const categories = useAppStore((state) => state.categories);
   const budgets = useAppStore((state) => state.budgets);
   const transactions = useAppStore((state) => state.transactions);
   const addBudget = useAppStore((state) => state.addBudget);
   const updateBudget = useAppStore((state) => state.updateBudget);
+  const deleteBudget = useAppStore((state) => state.deleteBudget);
 
   const expenseCategories = useMemo(
     () => categories.filter((category) => category.kind === "expense"),
     [categories]
   );
 
-  const budgetMap = useMemo(
-    () =>
-      new Map(
-        budgets
-          .filter((budget) => budget.month === month)
-          .map((budget) => [budget.categoryId, budget])
-      ),
-    [budgets, month]
-  );
-
   const rows = useMemo(
-    () => getBudgetRows(categories, budgets, transactions, month),
-    [budgets, categories, month, transactions]
+    () => getBudgetEditorRows(expenseCategories, budgets, transactions, month),
+    [budgets, expenseCategories, month, transactions]
   );
 
-  const rowMap = useMemo(
+  const budgetMap = useMemo(
     () => new Map(rows.map((row) => [row.categoryId, row])),
     [rows]
+  );
+
+  const availableCategories = useMemo(
+    () => getAvailableBudgetCategories(expenseCategories, budgets, month),
+    [budgets, expenseCategories, month]
   );
 
   const summary = useMemo(
@@ -57,8 +58,8 @@ export function BudgetPage() {
   );
 
   const draftPlannedTotal = useMemo(
-    () => getDraftPlannedTotal(expenseCategories, drafts),
-    [drafts, expenseCategories]
+    () => getDraftPlannedTotal(rows, drafts),
+    [drafts, rows]
   );
 
   const draftSummary = useMemo(
@@ -68,18 +69,28 @@ export function BudgetPage() {
 
   useEffect(() => {
     const nextDrafts = Object.fromEntries(
-      expenseCategories.map((category) => {
-        const existing = budgetMap.get(category.id);
+      rows.map((row) => {
+        const existing = budgetMap.get(row.categoryId);
 
         return [
-          category.id,
+          row.categoryId,
           existing ? formatCentsForInput(existing.plannedCents) : "",
         ];
       })
     );
 
     setDrafts(nextDrafts);
-  }, [budgetMap, expenseCategories, month]);
+  }, [budgetMap, rows]);
+
+  useEffect(() => {
+    setNewCategoryId((current) => {
+      if (availableCategories.some((category) => category.id === current)) {
+        return current;
+      }
+
+      return availableCategories[0]?.id ?? "";
+    });
+  }, [availableCategories]);
 
   function updateDraft(categoryId: string, value: string) {
     setDrafts((current) => ({
@@ -97,41 +108,83 @@ export function BudgetPage() {
 
   function isDirty(categoryId: string): boolean {
     const existing = budgetMap.get(categoryId);
+
+    if (!existing) {
+      return false;
+    }
+
     const currentCents = getDraftCents(categoryId);
-    const existingCents = existing?.plannedCents ?? 0;
+    const existingCents = existing.plannedCents;
 
     return currentCents !== existingCents;
   }
 
   function saveCategoryBudget(categoryId: string) {
-    const plannedCents = getDraftCents(categoryId);
     const existing = budgetMap.get(categoryId);
 
-    if (existing) {
-      if (existing.plannedCents !== plannedCents) {
-        updateBudget(existing.id, { plannedCents });
-      }
-
+    if (!existing) {
       return;
     }
 
-    if (plannedCents === 0) {
+    const plannedCents = getDraftCents(categoryId);
+
+    if (existing.plannedCents !== plannedCents) {
+      updateBudget(existing.budgetId, { plannedCents });
+    }
+  }
+
+  function removeCategoryBudget(categoryId: string) {
+    const existing = budgetMap.get(categoryId);
+
+    if (!existing) {
+      return;
+    }
+
+    deleteBudget(existing.budgetId);
+
+    setDrafts((current) => {
+      const next = { ...current };
+
+      delete next[categoryId];
+      return next;
+    });
+  }
+
+  function saveAllBudgets() {
+    rows.forEach((row) => {
+      saveCategoryBudget(row.categoryId);
+    });
+  }
+
+  function handleAddBudget() {
+    setAddError("");
+
+    if (!newCategoryId) {
+      setAddError("choose an expense category");
+      return;
+    }
+
+    if (hasBudgetForMonthCategory(budgets, month, newCategoryId)) {
+      setAddError("budget already exists for this category and month");
+      return;
+    }
+
+    const parsed = parseAmountInputToCents(newPlannedAmount);
+    const plannedCents = parsed ?? 0;
+
+    if (plannedCents < 0) {
+      setAddError("planned amount must be zero or more");
       return;
     }
 
     addBudget(
       createBudget({
         month,
-        categoryId,
+        categoryId: newCategoryId,
         plannedCents,
       })
     );
-  }
-
-  function saveAllBudgets() {
-    expenseCategories.forEach((category) => {
-      saveCategoryBudget(category.id);
-    });
+    setNewPlannedAmount("");
   }
 
   return (
@@ -270,6 +323,80 @@ export function BudgetPage() {
         }}
       >
         <div style={{ overflowX: "auto" }}>
+          <div
+            style={{
+              display: "grid",
+              gap: "0.75rem",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              marginBottom: "1rem",
+              alignItems: "end",
+            }}
+          >
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              <span style={{ fontSize: "0.9rem", color: "#374151" }}>add category</span>
+              <select
+                value={newCategoryId}
+                onChange={(event) => setNewCategoryId(event.target.value)}
+                disabled={availableCategories.length === 0}
+                style={{
+                  padding: "0.55rem 0.7rem",
+                  borderRadius: "0.5rem",
+                  border: "1px solid #d1d5db",
+                  background: "#ffffff",
+                }}
+              >
+                {availableCategories.length === 0 ? (
+                  <option value="">all expense categories already budgeted</option>
+                ) : null}
+
+                {availableCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              <span style={{ fontSize: "0.9rem", color: "#374151" }}>planned</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={newPlannedAmount}
+                onChange={(event) => setNewPlannedAmount(event.target.value)}
+                style={{
+                  padding: "0.55rem 0.7rem",
+                  borderRadius: "0.5rem",
+                  border: "1px solid #d1d5db",
+                  background: "#ffffff",
+                }}
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={handleAddBudget}
+              disabled={availableCategories.length === 0}
+              style={{
+                padding: "0.7rem 0.95rem",
+                borderRadius: "0.5rem",
+                border: "1px solid #d1d5db",
+                background: availableCategories.length === 0 ? "#f3f4f6" : "#111827",
+                color: availableCategories.length === 0 ? "#9ca3af" : "#ffffff",
+                cursor: availableCategories.length === 0 ? "not-allowed" : "pointer",
+              }}
+            >
+              add budget
+            </button>
+          </div>
+
+          {addError ? (
+            <p style={{ margin: "0 0 1rem", color: "#b91c1c", fontSize: "0.9rem" }}>
+              {addError}
+            </p>
+          ) : null}
+
           <table
             style={{
               width: "100%",
@@ -291,22 +418,21 @@ export function BudgetPage() {
               </tr>
             </thead>
             <tbody>
-              {expenseCategories.map((category) => {
-                const row = rowMap.get(category.id);
-                const dirty = isDirty(category.id);
+              {rows.map((row) => {
+                const dirty = isDirty(row.categoryId);
                 const remainingCents = getDraftRemainingCents(
-                  getDraftCents(category.id),
-                  row?.actualCents ?? 0
+                  getDraftCents(row.categoryId),
+                  row.actualCents
                 );
                 const overBudget = remainingCents < 0;
 
                 return (
                   <tr
-                    key={category.id}
+                    key={row.budgetId}
                     style={{ borderBottom: "1px solid #f3f4f6" }}
                   >
                     <td style={{ padding: "0.65rem 0.5rem" }}>
-                      {category.name}
+                      {row.categoryName}
                     </td>
 
                     <td style={{ padding: "0.65rem 0.5rem" }}>
@@ -314,9 +440,9 @@ export function BudgetPage() {
                         type="text"
                         inputMode="decimal"
                         placeholder="0.00"
-                        value={drafts[category.id] ?? ""}
+                        value={drafts[row.categoryId] ?? ""}
                         onChange={(event) =>
-                          updateDraft(category.id, event.target.value)
+                          updateDraft(row.categoryId, event.target.value)
                         }
                         style={{
                           width: "120px",
@@ -331,7 +457,7 @@ export function BudgetPage() {
                     </td>
 
                     <td style={{ padding: "0.65rem 0.5rem" }}>
-                      {formatCents(row?.actualCents ?? 0)}
+                      {formatCents(row.actualCents)}
                     </td>
 
                     <td
@@ -345,33 +471,50 @@ export function BudgetPage() {
                     </td>
 
                     <td style={{ padding: "0.65rem 0.5rem" }}>
-                      <button
-                        type="button"
-                        onClick={() => saveCategoryBudget(category.id)}
-                        disabled={!dirty}
-                        style={{
-                          padding: "0.45rem 0.65rem",
-                          borderRadius: "0.45rem",
-                          border: "1px solid #d1d5db",
-                          background: dirty ? "#111827" : "#f3f4f6",
-                          color: dirty ? "#ffffff" : "#9ca3af",
-                          cursor: dirty ? "pointer" : "not-allowed",
-                        }}
-                      >
-                        save
-                      </button>
+                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          onClick={() => saveCategoryBudget(row.categoryId)}
+                          disabled={!dirty}
+                          style={{
+                            padding: "0.45rem 0.65rem",
+                            borderRadius: "0.45rem",
+                            border: "1px solid #d1d5db",
+                            background: dirty ? "#111827" : "#f3f4f6",
+                            color: dirty ? "#ffffff" : "#9ca3af",
+                            cursor: dirty ? "pointer" : "not-allowed",
+                          }}
+                        >
+                          save
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => removeCategoryBudget(row.categoryId)}
+                          style={{
+                            padding: "0.45rem 0.65rem",
+                            borderRadius: "0.45rem",
+                            border: "1px solid #ef4444",
+                            background: "#ffffff",
+                            color: "#b91c1c",
+                            cursor: "pointer",
+                          }}
+                        >
+                          remove
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
               })}
 
-              {expenseCategories.length === 0 ? (
+              {rows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={5}
                     style={{ padding: "1rem 0.5rem", color: "#6b7280" }}
                   >
-                    no expense categories yet. that would be nice in real life.
+                    no budgets for this month yet. add one to get started.
                   </td>
                 </tr>
               ) : null}

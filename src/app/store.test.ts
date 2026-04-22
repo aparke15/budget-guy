@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { parsePersistedStateJson } from "./storage";
 import { createSeedState } from "../seed/seed-data";
 import type { PersistedState } from "../types";
 
@@ -47,6 +48,7 @@ function createPersistedState(overrides: Partial<PersistedState> = {}): Persiste
 
 async function loadStore(initialState?: PersistedState) {
   const localStorage = new MemoryStorage();
+  let uuidCounter = 0;
 
   if (initialState) {
     localStorage.setItem(storagekey, JSON.stringify(initialState));
@@ -54,7 +56,7 @@ async function loadStore(initialState?: PersistedState) {
 
   vi.stubGlobal("localStorage", localStorage);
   vi.stubGlobal("crypto", {
-    randomUUID: vi.fn(() => "generated-uuid"),
+    randomUUID: vi.fn(() => `generated-uuid-${++uuidCounter}`),
   });
   vi.resetModules();
 
@@ -82,6 +84,7 @@ describe("app store", () => {
       transactions: [
         {
           id: "txn-older",
+          kind: "standard",
           date: "2026-04-01",
           amountCents: -100,
           accountId: "acct-1",
@@ -92,6 +95,7 @@ describe("app store", () => {
         },
         {
           id: "txn-newer",
+          kind: "standard",
           date: "2026-04-10",
           amountCents: -200,
           accountId: "acct-1",
@@ -147,6 +151,236 @@ describe("app store", () => {
     });
   });
 
+  it("creates an account opening-balance transaction and keeps exactly one per account", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-1",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore
+      .getState()
+      .upsertAccountOpeningBalance("acct-1", 15000, "2026-04-01");
+    useAppStore
+      .getState()
+      .upsertAccountOpeningBalance("acct-1", 25000, "2026-04-02");
+
+    const openingBalances = useAppStore
+      .getState()
+      .transactions.filter(
+        (transaction) =>
+          transaction.accountId === "acct-1" &&
+          transaction.kind === "opening-balance"
+      );
+
+    expect(openingBalances).toHaveLength(1);
+    expect(openingBalances[0]).toMatchObject({
+      amountCents: 25000,
+      date: "2026-04-02",
+    });
+  });
+
+  it("clears an existing account opening-balance transaction", async () => {
+    const persisted = createPersistedState({
+      transactions: [
+        {
+          id: "txn-opening",
+          kind: "opening-balance",
+          date: "2026-04-01",
+          amountCents: 15000,
+          accountId: "acct-1",
+          source: "manual",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().deleteAccountOpeningBalance("acct-1");
+
+    expect(useAppStore.getState().transactions).toEqual([]);
+  });
+
+  it("deletes account-linked transactions including opening balances", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-1",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-opening",
+          kind: "opening-balance",
+          date: "2026-04-01",
+          amountCents: 15000,
+          accountId: "acct-1",
+          source: "manual",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "txn-standard",
+          kind: "standard",
+          date: "2026-04-02",
+          amountCents: -500,
+          accountId: "acct-1",
+          categoryId: "cat-1",
+          source: "manual",
+          createdAt: "2026-04-02T00:00:00.000Z",
+          updatedAt: "2026-04-02T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-1",
+          kind: "standard",
+          name: "rent",
+          amountCents: -1000,
+          accountId: "acct-1",
+          categoryId: "cat-1",
+          frequency: "monthly",
+          startDate: "2026-04-01",
+          active: true,
+          dayOfMonth: 1,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().deleteAccount("acct-1");
+
+    expect(useAppStore.getState().accounts).toEqual([]);
+    expect(useAppStore.getState().transactions).toEqual([]);
+    expect(useAppStore.getState().recurringRules).toEqual([]);
+  });
+
+  it("replaces the full persisted state and saves it immediately", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-old",
+          name: "old",
+          type: "cash",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const replacement = createPersistedState({
+      accounts: [
+        {
+          id: "acct-new",
+          name: "new checking",
+          type: "checking",
+          createdAt: "2026-04-21T00:00:00.000Z",
+          updatedAt: "2026-04-21T00:00:00.000Z",
+        },
+      ],
+      categories: [
+        {
+          id: "cat-1",
+          name: "rent",
+          kind: "expense",
+          createdAt: "2026-04-21T00:00:00.000Z",
+          updatedAt: "2026-04-21T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore, localStorage } = await loadStore(persisted);
+
+    useAppStore.getState().replacePersistedState(replacement);
+
+    expect(useAppStore.getState().accounts).toEqual(replacement.accounts);
+    expect(useAppStore.getState().categories).toEqual(replacement.categories);
+    expect(JSON.parse(localStorage.getItem(storagekey) ?? "null")).toEqual(replacement);
+  });
+
+  it("does not mutate store state when import parsing fails", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-1",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore, localStorage } = await loadStore(persisted);
+
+    const beforeState = useAppStore.getState().accounts;
+    const result = parsePersistedStateJson("{bad json}");
+
+    expect(result.success).toBe(false);
+    expect(useAppStore.getState().accounts).toEqual(beforeState);
+    expect(JSON.parse(localStorage.getItem(storagekey) ?? "null")).toEqual(persisted);
+  });
+
+  it("blocks duplicate budgets for the same month and category", async () => {
+    const persisted = createPersistedState({
+      budgets: [
+        {
+          id: "budget-1",
+          month: "2026-04",
+          categoryId: "cat-food",
+          plannedCents: 1000,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore, localStorage } = await loadStore(persisted);
+
+    useAppStore.getState().addBudget({
+      id: "budget-2",
+      month: "2026-04",
+      categoryId: "cat-food",
+      plannedCents: 2000,
+      createdAt: "2026-04-21T12:34:56.000Z",
+      updatedAt: "2026-04-21T12:34:56.000Z",
+    });
+
+    expect(useAppStore.getState().budgets).toHaveLength(1);
+
+    useAppStore.getState().addBudget({
+      id: "budget-3",
+      month: "2026-04",
+      categoryId: "cat-rent",
+      plannedCents: 3000,
+      createdAt: "2026-04-21T12:34:56.000Z",
+      updatedAt: "2026-04-21T12:34:56.000Z",
+    });
+
+    expect(useAppStore.getState().budgets).toHaveLength(2);
+
+    useAppStore.getState().updateBudget("budget-3", {
+      categoryId: "cat-food",
+    });
+
+    expect(useAppStore.getState().budgets.find((item) => item.id === "budget-3"))
+      .toMatchObject({ categoryId: "cat-rent" });
+
+    const saved = JSON.parse(localStorage.getItem(storagekey) ?? "null") as PersistedState;
+
+    expect(saved.budgets).toHaveLength(2);
+  });
+
   it("generates recurring transactions once per month and keeps them sorted", async () => {
     const persisted = createPersistedState({
       accounts: [
@@ -170,6 +404,7 @@ describe("app store", () => {
       transactions: [
         {
           id: "txn-existing",
+          kind: "standard",
           date: "2026-04-02",
           amountCents: -500,
           accountId: "acct-1",
@@ -182,6 +417,7 @@ describe("app store", () => {
       recurringRules: [
         {
           id: "rule-1",
+          kind: "standard",
           name: "rent",
           amountCents: -180000,
           accountId: "acct-1",
@@ -201,7 +437,8 @@ describe("app store", () => {
 
     expect(useAppStore.getState().transactions).toHaveLength(2);
     expect(useAppStore.getState().transactions[0]).toMatchObject({
-      id: "generated-uuid",
+      id: "generated-uuid-1",
+      kind: "standard",
       date: "2026-04-15",
       amountCents: -180000,
       accountId: "acct-1",
@@ -212,7 +449,7 @@ describe("app store", () => {
       updatedAt: "2026-04-21T12:34:56.000Z",
     });
     expect(useAppStore.getState().transactions.map((item) => item.id)).toEqual([
-      "generated-uuid",
+      "generated-uuid-1",
       "txn-existing",
     ]);
 
@@ -223,6 +460,264 @@ describe("app store", () => {
     const saved = JSON.parse(localStorage.getItem(storagekey) ?? "null") as PersistedState;
 
     expect(saved.transactions).toHaveLength(2);
+  });
+
+  it("generates recurring transfers as exactly one linked pair per occurrence", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-checking",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "acct-savings",
+          name: "savings",
+          type: "savings",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-transfer",
+          kind: "transfer",
+          name: "save",
+          amountCents: 2500,
+          accountId: "acct-checking",
+          toAccountId: "acct-savings",
+          frequency: "monthly",
+          startDate: "2026-01-01",
+          active: true,
+          dayOfMonth: 15,
+          note: "monthly transfer",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore, localStorage } = await loadStore(persisted);
+
+    useAppStore.getState().generateRecurringForMonth("2026-04");
+
+    const transactions = useAppStore.getState().transactions;
+
+    expect(transactions).toHaveLength(2);
+    expect(transactions[0]?.transferGroupId).toBe(transactions[1]?.transferGroupId);
+    expect(transactions).toEqual([
+      expect.objectContaining({
+        kind: "transfer",
+        source: "recurring",
+        recurringRuleId: "rule-transfer",
+        date: "2026-04-15",
+        amountCents: -2500,
+        accountId: "acct-checking",
+        note: "monthly transfer",
+      }),
+      expect.objectContaining({
+        kind: "transfer",
+        source: "recurring",
+        recurringRuleId: "rule-transfer",
+        date: "2026-04-15",
+        amountCents: 2500,
+        accountId: "acct-savings",
+        note: "monthly transfer",
+      }),
+    ]);
+
+    useAppStore.getState().generateRecurringForMonth("2026-04");
+    expect(useAppStore.getState().transactions).toHaveLength(2);
+
+    const saved = JSON.parse(localStorage.getItem(storagekey) ?? "null") as PersistedState;
+    expect(saved.transactions).toHaveLength(2);
+  });
+
+  it("generates yearly standard recurring transactions only for the matching month", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-1",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      categories: [
+        {
+          id: "cat-1",
+          name: "dues",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-yearly",
+          kind: "standard",
+          name: "dues",
+          amountCents: -12000,
+          accountId: "acct-1",
+          categoryId: "cat-1",
+          frequency: "yearly",
+          startDate: "2024-09-12",
+          active: true,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().generateRecurringForMonth("2026-08");
+    expect(useAppStore.getState().transactions).toHaveLength(0);
+
+    useAppStore.getState().generateRecurringForMonth("2026-09");
+    expect(useAppStore.getState().transactions).toEqual([
+      expect.objectContaining({
+        kind: "standard",
+        date: "2026-09-12",
+        amountCents: -12000,
+        recurringRuleId: "rule-yearly",
+        source: "recurring",
+      }),
+    ]);
+
+    useAppStore.getState().generateRecurringForMonth("2026-09");
+    expect(useAppStore.getState().transactions).toHaveLength(1);
+  });
+
+  it("generates yearly recurring transfer pairs only in matching leap-safe month/day cases", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-checking",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "acct-savings",
+          name: "savings",
+          type: "savings",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-yearly-transfer",
+          kind: "transfer",
+          name: "leap save",
+          amountCents: 5000,
+          accountId: "acct-checking",
+          toAccountId: "acct-savings",
+          frequency: "yearly",
+          startDate: "2024-02-29",
+          active: true,
+          note: "leap transfer",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().generateRecurringForMonth("2027-02");
+    expect(useAppStore.getState().transactions).toHaveLength(0);
+
+    useAppStore.getState().generateRecurringForMonth("2028-02");
+    expect(useAppStore.getState().transactions).toHaveLength(2);
+    expect(useAppStore.getState().transactions).toEqual([
+      expect.objectContaining({
+        kind: "transfer",
+        date: "2028-02-29",
+        amountCents: -5000,
+        accountId: "acct-checking",
+        recurringRuleId: "rule-yearly-transfer",
+        source: "recurring",
+      }),
+      expect.objectContaining({
+        kind: "transfer",
+        date: "2028-02-29",
+        amountCents: 5000,
+        accountId: "acct-savings",
+        recurringRuleId: "rule-yearly-transfer",
+        source: "recurring",
+      }),
+    ]);
+
+    useAppStore.getState().generateRecurringForMonth("2028-02");
+    expect(useAppStore.getState().transactions).toHaveLength(2);
+  });
+
+  it("does not generate duplicate recurring transfer pairs when one side already exists", async () => {
+    const { useAppStore } = await loadStore(
+      createPersistedState({
+        accounts: [
+          {
+            id: "acct-checking",
+            name: "checking",
+            type: "checking",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+          {
+            id: "acct-savings",
+            name: "savings",
+            type: "savings",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+        ],
+        recurringRules: [
+          {
+            id: "rule-transfer",
+            kind: "transfer",
+            name: "save",
+            amountCents: 2500,
+            accountId: "acct-checking",
+            toAccountId: "acct-savings",
+            frequency: "monthly",
+            startDate: "2026-01-01",
+            active: true,
+            dayOfMonth: 15,
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+        ],
+      })
+    );
+
+    useAppStore.setState({
+      transactions: [
+        {
+          id: "txn-transfer-out",
+          kind: "transfer",
+          date: "2026-04-15",
+          amountCents: -2500,
+          accountId: "acct-checking",
+          source: "recurring",
+          recurringRuleId: "rule-transfer",
+          transferGroupId: "transfer-1",
+          createdAt: "2026-04-15T00:00:00.000Z",
+          updatedAt: "2026-04-15T00:00:00.000Z",
+        },
+      ],
+    });
+
+    useAppStore.getState().generateRecurringForMonth("2026-04");
+
+    expect(useAppStore.getState().transactions).toHaveLength(1);
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      id: "txn-transfer-out",
+      recurringRuleId: "rule-transfer",
+      date: "2026-04-15",
+    });
   });
 
   it("resets state back to seeded data", async () => {
@@ -256,5 +751,223 @@ describe("app store", () => {
     const saved = JSON.parse(localStorage.getItem(storagekey) ?? "null") as PersistedState;
 
     expect(saved.accounts).toEqual(seeded.accounts);
+  });
+
+  it("adds transfers as exactly two linked transactions", async () => {
+    const { useAppStore, localStorage } = await loadStore(
+      createPersistedState({
+        accounts: [
+          {
+            id: "acct-checking",
+            name: "checking",
+            type: "checking",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+          {
+            id: "acct-savings",
+            name: "savings",
+            type: "savings",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+        ],
+      })
+    );
+
+    useAppStore.getState().addTransfer({
+      date: "2026-04-21",
+      fromAccountId: "acct-checking",
+      toAccountId: "acct-savings",
+      amountCents: 2500,
+      note: "move to savings",
+    });
+
+    const transactions = useAppStore.getState().transactions;
+
+    expect(transactions).toHaveLength(2);
+    expect(transactions.map((transaction) => transaction.transferGroupId)).toEqual([
+      transactions[0]?.transferGroupId,
+      transactions[0]?.transferGroupId,
+    ]);
+    expect(transactions).toEqual([
+      expect.objectContaining({
+        kind: "transfer",
+        date: "2026-04-21",
+        amountCents: -2500,
+        accountId: "acct-checking",
+        note: "move to savings",
+        source: "manual",
+      }),
+      expect.objectContaining({
+        kind: "transfer",
+        date: "2026-04-21",
+        amountCents: 2500,
+        accountId: "acct-savings",
+        note: "move to savings",
+        source: "manual",
+      }),
+    ]);
+
+    const saved = JSON.parse(localStorage.getItem(storagekey) ?? "null") as PersistedState;
+    expect(saved.transactions).toHaveLength(2);
+  });
+
+  it("updates both sides of a transfer together and preserves transfer ids", async () => {
+    const persisted = createPersistedState({
+      transactions: [
+        {
+          id: "txn-transfer-out",
+          kind: "transfer",
+          date: "2026-04-10",
+          amountCents: -2500,
+          accountId: "acct-checking",
+          note: "old note",
+          source: "manual",
+          transferGroupId: "transfer-1",
+          createdAt: "2026-04-10T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+        {
+          id: "txn-transfer-in",
+          kind: "transfer",
+          date: "2026-04-10",
+          amountCents: 2500,
+          accountId: "acct-savings",
+          note: "old note",
+          source: "manual",
+          transferGroupId: "transfer-1",
+          createdAt: "2026-04-10T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().updateTransfer("transfer-1", {
+      date: "2026-04-22",
+      fromAccountId: "acct-savings",
+      toAccountId: "acct-checking",
+      amountCents: 4200,
+      note: "updated",
+    });
+
+    expect(useAppStore.getState().transactions).toEqual([
+      expect.objectContaining({
+        id: "txn-transfer-out",
+        kind: "transfer",
+        date: "2026-04-22",
+        amountCents: -4200,
+        accountId: "acct-savings",
+        note: "updated",
+        transferGroupId: "transfer-1",
+      }),
+      expect.objectContaining({
+        id: "txn-transfer-in",
+        kind: "transfer",
+        date: "2026-04-22",
+        amountCents: 4200,
+        accountId: "acct-checking",
+        note: "updated",
+        transferGroupId: "transfer-1",
+      }),
+    ]);
+  });
+
+  it("deletes both sides of a transfer through dedicated and generic delete flows", async () => {
+    const persisted = createPersistedState({
+      transactions: [
+        {
+          id: "txn-transfer-out",
+          kind: "transfer",
+          date: "2026-04-10",
+          amountCents: -2500,
+          accountId: "acct-checking",
+          source: "manual",
+          transferGroupId: "transfer-1",
+          createdAt: "2026-04-10T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+        {
+          id: "txn-transfer-in",
+          kind: "transfer",
+          date: "2026-04-10",
+          amountCents: 2500,
+          accountId: "acct-savings",
+          source: "manual",
+          transferGroupId: "transfer-1",
+          createdAt: "2026-04-10T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().deleteTransaction("txn-transfer-out");
+    expect(useAppStore.getState().transactions).toEqual([]);
+
+    useAppStore.setState({
+      transactions: [...persisted.transactions],
+    });
+
+    useAppStore.getState().deleteTransfer("transfer-1");
+    expect(useAppStore.getState().transactions).toEqual([]);
+  });
+
+  it("routes generic transfer updates through pair-safe logic", async () => {
+    const persisted = createPersistedState({
+      transactions: [
+        {
+          id: "txn-transfer-out",
+          kind: "transfer",
+          date: "2026-04-10",
+          amountCents: -2500,
+          accountId: "acct-checking",
+          note: "old note",
+          source: "manual",
+          transferGroupId: "transfer-1",
+          createdAt: "2026-04-10T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+        {
+          id: "txn-transfer-in",
+          kind: "transfer",
+          date: "2026-04-10",
+          amountCents: 2500,
+          accountId: "acct-savings",
+          note: "old note",
+          source: "manual",
+          transferGroupId: "transfer-1",
+          createdAt: "2026-04-10T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().updateTransaction("txn-transfer-out", {
+      date: "2026-04-12",
+      amountCents: -3300,
+      accountId: "acct-cash",
+      note: "pair-safe",
+    });
+
+    expect(useAppStore.getState().transactions).toEqual([
+      expect.objectContaining({
+        id: "txn-transfer-out",
+        date: "2026-04-12",
+        amountCents: -3300,
+        accountId: "acct-cash",
+        note: "pair-safe",
+      }),
+      expect.objectContaining({
+        id: "txn-transfer-in",
+        date: "2026-04-12",
+        amountCents: 3300,
+        accountId: "acct-savings",
+        note: "pair-safe",
+      }),
+    ]);
   });
 });

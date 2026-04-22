@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatCentsForInput,
+  formatSignedCentsForInput,
   getBudgetRows,
   getMonthlySummary,
   parseAmountInputToCents,
@@ -38,6 +39,7 @@ const categories: Category[] = [
 const transactions: Transaction[] = [
   {
     id: "txn-1",
+    kind: "standard",
     date: "2026-04-01",
     amountCents: 250000,
     accountId: "acct-1",
@@ -48,6 +50,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "txn-2",
+    kind: "standard",
     date: "2026-04-02",
     amountCents: -120000,
     accountId: "acct-1",
@@ -58,6 +61,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "txn-3",
+    kind: "standard",
     date: "2026-04-03",
     amountCents: -4500,
     accountId: "acct-1",
@@ -68,6 +72,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "txn-4",
+    kind: "standard",
     date: "2026-03-31",
     amountCents: -9999,
     accountId: "acct-1",
@@ -110,6 +115,11 @@ describe("money utilities", () => {
     expect(formatCentsForInput(-12345)).toBe("123.45");
   });
 
+  it("formats signed cents for signed inputs", () => {
+    expect(formatSignedCentsForInput(-12345)).toBe("-123.45");
+    expect(formatSignedCentsForInput(12345)).toBe("123.45");
+  });
+
   it("parses decimal input into cents and rejects invalid values", () => {
     expect(parseAmountInputToCents(" $1,234.56 ")).toBe(123456);
     expect(parseAmountInputToCents("0.015")).toBe(2);
@@ -121,6 +131,112 @@ describe("money utilities", () => {
     expect(sumIncomeCents(transactions, "2026-04")).toBe(250000);
     expect(sumExpenseCents(transactions, "2026-04")).toBe(124500);
     expect(sumCategoryActualCents(transactions, "2026-04", "cat-food")).toBe(4500);
+  });
+
+  it("excludes transfers from income, expense, net, and category totals", () => {
+    const withTransfer: Transaction[] = [
+      ...transactions,
+      {
+        id: "txn-transfer-out",
+        kind: "transfer",
+        date: "2026-04-04",
+        amountCents: -50000,
+        accountId: "acct-1",
+        note: "move to savings",
+        source: "manual",
+        transferGroupId: "transfer-1",
+        createdAt: "2026-04-04T00:00:00.000Z",
+        updatedAt: "2026-04-04T00:00:00.000Z",
+      },
+      {
+        id: "txn-transfer-in",
+        kind: "transfer",
+        date: "2026-04-04",
+        amountCents: 50000,
+        accountId: "acct-2",
+        note: "move to savings",
+        source: "manual",
+        transferGroupId: "transfer-1",
+        createdAt: "2026-04-04T00:00:00.000Z",
+        updatedAt: "2026-04-04T00:00:00.000Z",
+      },
+    ];
+
+    expect(sumIncomeCents(withTransfer, "2026-04")).toBe(250000);
+    expect(sumExpenseCents(withTransfer, "2026-04")).toBe(124500);
+    expect(sumCategoryActualCents(withTransfer, "2026-04", "cat-food")).toBe(4500);
+    expect(getMonthlySummary(withTransfer, budgets, "2026-04")).toEqual({
+      incomeCents: 250000,
+      expenseCents: 124500,
+      netCents: 125500,
+      plannedCents: 130000,
+      unassignedCents: 120000,
+    });
+    expect(getBudgetRows(categories, budgets, withTransfer, "2026-04")).toEqual([
+      {
+        categoryId: "cat-rent",
+        categoryName: "Rent",
+        plannedCents: 110000,
+        actualCents: 120000,
+        remainingCents: -10000,
+        overBudget: true,
+      },
+      {
+        categoryId: "cat-food",
+        categoryName: "Food",
+        plannedCents: 20000,
+        actualCents: 4500,
+        remainingCents: 15500,
+        overBudget: false,
+      },
+    ]);
+  });
+
+  it("excludes opening-balance transactions from income, expenses, budgets, and unassigned", () => {
+    const withOpeningBalance: Transaction[] = [
+      {
+        id: "txn-opening",
+        kind: "opening-balance",
+        date: "2026-04-01",
+        amountCents: 500000,
+        accountId: "acct-1",
+        source: "manual",
+        createdAt: "2026-04-01T00:00:00.000Z",
+        updatedAt: "2026-04-01T00:00:00.000Z",
+      },
+      ...transactions,
+    ];
+
+    expect(sumIncomeCents(withOpeningBalance, "2026-04")).toBe(250000);
+    expect(sumExpenseCents(withOpeningBalance, "2026-04")).toBe(124500);
+    expect(sumCategoryActualCents(withOpeningBalance, "2026-04", "cat-food")).toBe(
+      4500
+    );
+    expect(getMonthlySummary(withOpeningBalance, budgets, "2026-04")).toEqual({
+      incomeCents: 250000,
+      expenseCents: 124500,
+      netCents: 125500,
+      plannedCents: 130000,
+      unassignedCents: 120000,
+    });
+    expect(getBudgetRows(categories, budgets, withOpeningBalance, "2026-04")).toEqual([
+      {
+        categoryId: "cat-rent",
+        categoryName: "Rent",
+        plannedCents: 110000,
+        actualCents: 120000,
+        remainingCents: -10000,
+        overBudget: true,
+      },
+      {
+        categoryId: "cat-food",
+        categoryName: "Food",
+        plannedCents: 20000,
+        actualCents: 4500,
+        remainingCents: 15500,
+        overBudget: false,
+      },
+    ]);
   });
 
   it("computes monthly summary values from transactions and budgets", () => {

@@ -1,17 +1,27 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type SubmitEvent } from "react";
 
 import { useAppStore } from "../../app/store";
 import {
+  buildBackupFileName,
+  buildPersistedStateSnapshot,
+  exportPersistedStateJson,
+  parsePersistedStateJson,
+} from "../../app/storage";
+import {
   createAccount,
   createCategory,
-  createRecurringRule,
 } from "../../lib/factories";
-import { formatCents, formatCentsForInput, parseAmountInputToCents } from "../../lib/money";
-import { recurringRuleSchema } from "../../lib/validation";
+import { formatCents } from "../../lib/money";
 import {
+  buildDuplicateName,
   buildDeleteImpact,
+  countRecurringRulesByAccountId,
   countById,
+  createAccountFormValues,
+  getAccountOpeningBalanceTransaction,
   normalizeEntityName,
+  parseAccountCreditLimitInput,
+  parseAccountOpeningBalanceInput,
   sortItemsByName,
   type DeleteImpact,
   type PendingDelete,
@@ -23,60 +33,15 @@ import type {
 } from "../types";
 import type {
   Account,
-  AccountType,
+  Budget,
   Category,
-  CategoryKind,
-  RecurringFrequency,
+  PersistedState,
   RecurringRule,
+  Transaction,
 } from "../../types";
-
-const cardStyle = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: "0.75rem",
-  padding: "1rem",
-} as const;
-
-const inputStyle = {
-  padding: "0.55rem 0.7rem",
-  borderRadius: "0.5rem",
-  border: "1px solid #d1d5db",
-  background: "#ffffff",
-} as const;
-
-const primaryButtonStyle = {
-  padding: "0.65rem 0.9rem",
-  borderRadius: "0.5rem",
-  border: "1px solid #111827",
-  background: "#111827",
-  color: "#ffffff",
-  cursor: "pointer",
-} as const;
-
-const secondaryButtonStyle = {
-  padding: "0.65rem 0.9rem",
-  borderRadius: "0.5rem",
-  border: "1px solid #d1d5db",
-  background: "#ffffff",
-  color: "#111827",
-  cursor: "pointer",
-} as const;
-
-const dangerButtonStyle = {
-  padding: "0.65rem 0.9rem",
-  borderRadius: "0.5rem",
-  border: "1px solid #ef4444",
-  background: "#ffffff",
-  color: "#b91c1c",
-  cursor: "pointer",
-} as const;
-
-function createAccountFormValues(): AccountFormValues {
-  return {
-    name: "",
-    type: "checking",
-  };
-}
+import { AccountEditor, CategoryEditor, RecurringRuleEditor } from "../components/editors";
+import { cardStyle, dangerButtonStyle, primaryButtonStyle, secondaryButtonStyle } from "../components/style-constants";
+import { buildRecurringRuleCandidate, createRecurringRuleFormValues, ensureRecurringFormReferences, getRecurringDetails, updateRecurringFrequency, updateRecurringKind, updateRecurringStartDate } from "../recurring/recurring-helpers";
 
 function createCategoryFormValues(): CategoryFormValues {
   return {
@@ -85,646 +50,33 @@ function createCategoryFormValues(): CategoryFormValues {
   };
 }
 
-function getDefaultAccountId(accounts: Account[]): string {
-  return accounts[0]?.id ?? "";
-}
-
-function getDefaultCategoryId(categories: Category[]): string {
-  return categories.find((category) => category.kind === "expense")?.id ?? categories[0]?.id ?? "";
-}
-
-function getDayOfMonthFromDate(date: string): string {
-  if (!date) {
-    return "1";
-  }
-
-  return String(Number(date.slice(8, 10)) || 1);
-}
-
-function getDayOfWeekFromDate(date: string): string {
-  if (!date) {
-    return "0";
-  }
-
-  const parsed = new Date(`${date}T12:00:00`);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "0";
-  }
-
-  return String(parsed.getDay());
-}
-
-function createRecurringRuleFormValues(
-  accounts: Account[],
-  categories: Category[],
-  existing?: RecurringRule
-): RecurringRuleFormValues {
-  if (existing) {
-    return {
-      name: existing.name,
-      amount: formatCentsForInput(existing.amountCents),
-      accountId: existing.accountId,
-      categoryId: existing.categoryId,
-      frequency: existing.frequency,
-      startDate: existing.startDate,
-      endDate: existing.endDate ?? "",
-      active: existing.active,
-      dayOfMonth: existing.dayOfMonth != null ? String(existing.dayOfMonth) : "",
-      dayOfWeek: existing.dayOfWeek != null ? String(existing.dayOfWeek) : "",
-      merchant: existing.merchant ?? "",
-      note: existing.note ?? "",
-    };
-  }
-
-  const today = new Date().toISOString().slice(0, 10);
-
-  return {
-    name: "",
-    amount: "",
-    accountId: getDefaultAccountId(accounts),
-    categoryId: getDefaultCategoryId(categories),
-    frequency: "monthly",
-    startDate: today,
-    endDate: "",
-    active: true,
-    dayOfMonth: getDayOfMonthFromDate(today),
-    dayOfWeek: getDayOfWeekFromDate(today),
-    merchant: "",
-    note: "",
-  };
-}
-
-function ensureRecurringFormReferences(
-  values: RecurringRuleFormValues,
-  accounts: Account[],
-  categories: Category[]
-): RecurringRuleFormValues {
-  const nextAccountId =
-    accounts.some((account) => account.id === values.accountId)
-      ? values.accountId
-      : getDefaultAccountId(accounts);
-  const nextCategoryId =
-    categories.some((category) => category.id === values.categoryId)
-      ? values.categoryId
-      : getDefaultCategoryId(categories);
-
-  return {
-    ...values,
-    accountId: nextAccountId,
-    categoryId: nextCategoryId,
-  };
-}
-
-function updateRecurringFrequency(
-  values: RecurringRuleFormValues,
-  frequency: RecurringFrequency
-): RecurringRuleFormValues {
-  if (frequency === "monthly") {
-    return {
-      ...values,
-      frequency,
-      dayOfMonth: values.dayOfMonth || getDayOfMonthFromDate(values.startDate),
-      dayOfWeek: "",
-    };
-  }
-
-  return {
-    ...values,
-    frequency,
-    dayOfMonth: "",
-      dayOfWeek: values.dayOfWeek || getDayOfWeekFromDate(values.startDate),
-  };
-}
-
-function updateRecurringStartDate(
-  values: RecurringRuleFormValues,
-  startDate: string
-): RecurringRuleFormValues {
-  if (values.frequency === "monthly") {
-    return {
-      ...values,
-      startDate,
-      dayOfMonth: values.dayOfMonth || getDayOfMonthFromDate(startDate),
-    };
-  }
-
-  return {
-    ...values,
-    startDate,
-    dayOfWeek: values.dayOfWeek || getDayOfWeekFromDate(startDate),
-  };
-}
-
-function buildRecurringRuleCandidate(
-  values: RecurringRuleFormValues,
-  categories: Category[],
-  existing?: RecurringRule
-): RecurringRule {
-  if (!values.name.trim()) {
-    throw new Error("name is required");
-  }
-
-  if (!values.accountId) {
-    throw new Error("account is required");
-  }
-
-  if (!values.categoryId) {
-    throw new Error("category is required");
-  }
-
-  if (!values.startDate) {
-    throw new Error("start date is required");
-  }
-
-  const amountAbsCents = parseAmountInputToCents(values.amount);
-
-  if (amountAbsCents == null || amountAbsCents <= 0) {
-    throw new Error("amount must be a positive number");
-  }
-
-  const selectedCategory = categories.find(
-    (category) => category.id === values.categoryId
-  );
-
-  if (!selectedCategory) {
-    throw new Error("category is required");
-  }
-
-  const amountCents =
-    selectedCategory.kind === "income"
-      ? Math.abs(amountAbsCents)
-      : -Math.abs(amountAbsCents);
-
-  const dayOfMonth =
-    values.frequency === "monthly" && values.dayOfMonth.trim()
-      ? Number(values.dayOfMonth)
-      : undefined;
-  const dayOfWeek =
-    values.frequency !== "monthly" && values.dayOfWeek.trim()
-      ? Number(values.dayOfWeek)
-      : undefined;
-  const payload = {
-    name: values.name.trim(),
-    amountCents,
-    accountId: values.accountId,
-    categoryId: values.categoryId,
-    frequency: values.frequency,
-    startDate: values.startDate,
-    endDate: values.endDate.trim() || undefined,
-    active: values.active,
-    dayOfMonth,
-    dayOfWeek,
-    merchant: values.merchant,
-    note: values.note,
-  };
-  const candidate = existing
-    ? {
-        ...existing,
-        ...payload,
-        merchant: payload.merchant.trim() || undefined,
-        note: payload.note.trim() || undefined,
-      }
-    : createRecurringRule(payload);
-  const parsed = recurringRuleSchema.safeParse(candidate);
-
-  if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? "failed to save recurring rule");
-  }
-
-  return parsed.data;
-}
-
-function getWeekdayLabel(dayOfWeek?: number): string {
-  switch (dayOfWeek) {
-    case 0:
-      return "sun";
-    case 1:
-      return "mon";
-    case 2:
-      return "tue";
-    case 3:
-      return "wed";
-    case 4:
-      return "thu";
-    case 5:
-      return "fri";
-    case 6:
-      return "sat";
-    default:
-      return "n/a";
-  }
-}
-
-function getRecurringDetails(rule: RecurringRule): string {
-  if (rule.frequency === "monthly") {
-    return `monthly on day ${rule.dayOfMonth ?? "?"}`;
-  }
-
-  return `${rule.frequency} on ${getWeekdayLabel(rule.dayOfWeek)}`;
-}
-
-type AccountEditorProps = {
-  values: AccountFormValues;
-  error: string;
-  submitLabel: string;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onChange: <K extends keyof AccountFormValues>(
-    key: K,
-    value: AccountFormValues[K]
-  ) => void;
-  onCancel?: () => void;
-};
-
-function AccountEditor(props: AccountEditorProps) {
-  const { values, error, submitLabel, onSubmit, onChange, onCancel } = props;
-
-  return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: "0.75rem" }}>
-      <div
-        style={{
-          display: "grid",
-          gap: "0.75rem",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        }}
-      >
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>name</span>
-          <input
-            type="text"
-            value={values.name}
-            onChange={(event) => onChange("name", event.target.value)}
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>type</span>
-          <select
-            value={values.type}
-            onChange={(event) =>
-              onChange("type", event.target.value as AccountType)
-            }
-            style={inputStyle}
-          >
-            <option value="checking">checking</option>
-            <option value="savings">savings</option>
-            <option value="credit">credit</option>
-            <option value="cash">cash</option>
-          </select>
-        </label>
-      </div>
-
-      {error ? (
-        <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem" }}>
-          {error}
-        </p>
-      ) : null}
-
-      <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-        <button type="submit" style={primaryButtonStyle}>
-          {submitLabel}
-        </button>
-
-        {onCancel ? (
-          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
-            cancel
-          </button>
-        ) : null}
-      </div>
-    </form>
-  );
-}
-
-type CategoryEditorProps = {
-  values: CategoryFormValues;
-  error: string;
-  submitLabel: string;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onChange: <K extends keyof CategoryFormValues>(
-    key: K,
-    value: CategoryFormValues[K]
-  ) => void;
-  onCancel?: () => void;
-};
-
-function CategoryEditor(props: CategoryEditorProps) {
-  const { values, error, submitLabel, onSubmit, onChange, onCancel } = props;
-
-  return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: "0.75rem" }}>
-      <div
-        style={{
-          display: "grid",
-          gap: "0.75rem",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        }}
-      >
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>name</span>
-          <input
-            type="text"
-            value={values.name}
-            onChange={(event) => onChange("name", event.target.value)}
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>kind</span>
-          <select
-            value={values.kind}
-            onChange={(event) =>
-              onChange("kind", event.target.value as CategoryKind)
-            }
-            style={inputStyle}
-          >
-            <option value="expense">expense</option>
-            <option value="income">income</option>
-          </select>
-        </label>
-      </div>
-
-      {error ? (
-        <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem" }}>
-          {error}
-        </p>
-      ) : null}
-
-      <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-        <button type="submit" style={primaryButtonStyle}>
-          {submitLabel}
-        </button>
-
-        {onCancel ? (
-          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
-            cancel
-          </button>
-        ) : null}
-      </div>
-    </form>
-  );
-}
-
-type RecurringRuleEditorProps = {
-  values: RecurringRuleFormValues;
-  error: string;
-  accounts: Account[];
-  categories: Category[];
-  submitLabel: string;
-  submitDisabled?: boolean;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onCancel?: () => void;
-  onChange: <K extends keyof RecurringRuleFormValues>(
-    key: K,
-    value: RecurringRuleFormValues[K]
-  ) => void;
-  onFrequencyChange: (frequency: RecurringFrequency) => void;
-  onStartDateChange: (startDate: string) => void;
-};
-
-function RecurringRuleEditor(props: RecurringRuleEditorProps) {
-  const {
-    values,
-    error,
-    accounts,
-    categories,
-    submitLabel,
-    submitDisabled,
-    onSubmit,
-    onCancel,
-    onChange,
-    onFrequencyChange,
-    onStartDateChange,
-  } = props;
-  const selectedCategory = categories.find(
-    (category) => category.id === values.categoryId
-  );
-
-  return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: "0.75rem" }}>
-      <div
-        style={{
-          display: "grid",
-          gap: "0.75rem",
-          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-        }}
-      >
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>name</span>
-          <input
-            type="text"
-            value={values.name}
-            onChange={(event) => onChange("name", event.target.value)}
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>amount</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            placeholder="0.00"
-            value={values.amount}
-            onChange={(event) => onChange("amount", event.target.value)}
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>account</span>
-          <select
-            value={values.accountId}
-            onChange={(event) => onChange("accountId", event.target.value)}
-            style={inputStyle}
-          >
-            <option value="">select account</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>category</span>
-          <select
-            value={values.categoryId}
-            onChange={(event) => onChange("categoryId", event.target.value)}
-            style={inputStyle}
-          >
-            <option value="">select category</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name} ({category.kind})
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-            frequency
-          </span>
-          <select
-            value={values.frequency}
-            onChange={(event) =>
-              onFrequencyChange(event.target.value as RecurringFrequency)
-            }
-            style={inputStyle}
-          >
-            <option value="monthly">monthly</option>
-            <option value="weekly">weekly</option>
-            <option value="biweekly">biweekly</option>
-          </select>
-        </label>
-
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-            start date
-          </span>
-          <input
-            type="date"
-            value={values.startDate}
-            onChange={(event) => onStartDateChange(event.target.value)}
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>end date</span>
-          <input
-            type="date"
-            value={values.endDate}
-            onChange={(event) => onChange("endDate", event.target.value)}
-            style={inputStyle}
-          />
-        </label>
-
-        {values.frequency === "monthly" ? (
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              day of month
-            </span>
-            <input
-              type="number"
-              min="1"
-              max="31"
-              value={values.dayOfMonth}
-              onChange={(event) => onChange("dayOfMonth", event.target.value)}
-              style={inputStyle}
-            />
-          </label>
-        ) : (
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              day of week
-            </span>
-            <select
-              value={values.dayOfWeek}
-              onChange={(event) => onChange("dayOfWeek", event.target.value)}
-              style={inputStyle}
-            >
-              <option value="0">sun</option>
-              <option value="1">mon</option>
-              <option value="2">tue</option>
-              <option value="3">wed</option>
-              <option value="4">thu</option>
-              <option value="5">fri</option>
-              <option value="6">sat</option>
-            </select>
-          </label>
-        )}
-
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>merchant</span>
-          <input
-            type="text"
-            value={values.merchant}
-            onChange={(event) => onChange("merchant", event.target.value)}
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>note</span>
-          <input
-            type="text"
-            value={values.note}
-            onChange={(event) => onChange("note", event.target.value)}
-            style={inputStyle}
-          />
-        </label>
-      </div>
-
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          color: "#374151",
-          fontSize: "0.9rem",
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={values.active}
-          onChange={(event) => onChange("active", event.target.checked)}
-        />
-        active rule
-      </label>
-
-      <p style={{ margin: 0, color: "#6b7280", fontSize: "0.9rem" }}>
-        selected category kind: {selectedCategory?.kind ?? "n/a"}. saved amount will be {selectedCategory?.kind === "income" ? "positive" : "negative"}.
-      </p>
-
-      {error ? (
-        <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem" }}>
-          {error}
-        </p>
-      ) : null}
-
-      <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-        <button
-          type="submit"
-          disabled={submitDisabled}
-          style={{
-            ...primaryButtonStyle,
-            opacity: submitDisabled ? 0.6 : 1,
-            cursor: submitDisabled ? "not-allowed" : "pointer",
-          }}
-        >
-          {submitLabel}
-        </button>
-
-        {onCancel ? (
-          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
-            cancel
-          </button>
-        ) : null}
-      </div>
-    </form>
-  );
-}
-
 type AccountsSectionProps = {
   accounts: Account[];
+  transactions: Transaction[];
   transactionCounts: Record<string, number>;
   recurringRuleCounts: Record<string, number>;
   addAccount: (input: Account) => void;
   updateAccount: (id: string, input: Partial<Account>) => void;
+  upsertAccountOpeningBalance: (
+    accountId: string,
+    amountCents: number,
+    date: string,
+    note?: string
+  ) => void;
+  deleteAccountOpeningBalance: (accountId: string) => void;
   onRequestDelete: (account: Account) => void;
 };
 
 function AccountsSection(props: AccountsSectionProps) {
   const {
     accounts,
+    transactions,
     transactionCounts,
     recurringRuleCounts,
     addAccount,
     updateAccount,
+    upsertAccountOpeningBalance,
+    deleteAccountOpeningBalance,
     onRequestDelete,
   } = props;
   const [createValues, setCreateValues] = useState<AccountFormValues>(() =>
@@ -736,6 +88,17 @@ function AccountsSection(props: AccountsSectionProps) {
     createAccountFormValues()
   );
   const [editError, setEditError] = useState("");
+
+  const openingBalanceTransactionMap = useMemo(
+    () =>
+      new Map(
+        accounts.map((account) => [
+          account.id,
+          getAccountOpeningBalanceTransaction(transactions, account.id),
+        ])
+      ),
+    [accounts, transactions]
+  );
 
   useEffect(() => {
     if (editingId && !accounts.some((account) => account.id === editingId)) {
@@ -751,6 +114,8 @@ function AccountsSection(props: AccountsSectionProps) {
   ) {
     setCreateValues((current) => ({
       ...current,
+      creditLimit:
+        key === "type" && value !== "credit" ? "" : current.creditLimit,
       [key]: value,
     }));
   }
@@ -761,11 +126,13 @@ function AccountsSection(props: AccountsSectionProps) {
   ) {
     setEditValues((current) => ({
       ...current,
+      creditLimit:
+        key === "type" && value !== "credit" ? "" : current.creditLimit,
       [key]: value,
     }));
   }
 
-  function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleCreateSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreateError("");
 
@@ -785,20 +152,77 @@ function AccountsSection(props: AccountsSectionProps) {
       return;
     }
 
-    addAccount(createAccount(createValues));
+    const creditLimitInput = parseAccountCreditLimitInput(createValues.creditLimit);
+
+    if (createValues.type === "credit") {
+      if (creditLimitInput.hasValue && creditLimitInput.amountCents == null) {
+        setCreateError("credit limit must be a valid amount");
+        return;
+      }
+
+      if (
+        creditLimitInput.amountCents != null &&
+        creditLimitInput.amountCents <= 0
+      ) {
+        setCreateError("credit limit must be greater than zero");
+        return;
+      }
+    }
+
+    const openingBalanceInput = parseAccountOpeningBalanceInput(
+      createValues.openingBalance
+    );
+
+    if (openingBalanceInput.hasValue && openingBalanceInput.amountCents == null) {
+      setCreateError("opening balance must be a valid amount");
+      return;
+    }
+
+    if (
+      openingBalanceInput.amountCents != null &&
+      openingBalanceInput.amountCents !== 0 &&
+      !createValues.openingBalanceDate
+    ) {
+      setCreateError("opening balance date is required");
+      return;
+    }
+
+    const account = createAccount({
+      ...createValues,
+      creditLimitCents:
+        createValues.type === "credit"
+          ? creditLimitInput.amountCents ?? undefined
+          : undefined,
+    });
+
+    addAccount(account);
+
+    if (
+      openingBalanceInput.amountCents != null &&
+      openingBalanceInput.amountCents !== 0
+    ) {
+      upsertAccountOpeningBalance(
+        account.id,
+        openingBalanceInput.amountCents,
+        createValues.openingBalanceDate
+      );
+    }
+
     setCreateValues(createAccountFormValues());
   }
 
   function startEditing(account: Account) {
     setEditingId(account.id);
-    setEditValues({
-      name: account.name,
-      type: account.type,
-    });
+    setEditValues(
+      createAccountFormValues(
+        account,
+        openingBalanceTransactionMap.get(account.id)
+      )
+    );
     setEditError("");
   }
 
-  function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleEditSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!editingId) {
@@ -825,10 +249,63 @@ function AccountsSection(props: AccountsSectionProps) {
       return;
     }
 
+    const creditLimitInput = parseAccountCreditLimitInput(editValues.creditLimit);
+
+    if (editValues.type === "credit") {
+      if (creditLimitInput.hasValue && creditLimitInput.amountCents == null) {
+        setEditError("credit limit must be a valid amount");
+        return;
+      }
+
+      if (
+        creditLimitInput.amountCents != null &&
+        creditLimitInput.amountCents <= 0
+      ) {
+        setEditError("credit limit must be greater than zero");
+        return;
+      }
+    }
+
+    const openingBalanceInput = parseAccountOpeningBalanceInput(
+      editValues.openingBalance
+    );
+
+    if (openingBalanceInput.hasValue && openingBalanceInput.amountCents == null) {
+      setEditError("opening balance must be a valid amount");
+      return;
+    }
+
+    if (
+      openingBalanceInput.amountCents != null &&
+      openingBalanceInput.amountCents !== 0 &&
+      !editValues.openingBalanceDate
+    ) {
+      setEditError("opening balance date is required");
+      return;
+    }
+
     updateAccount(editingId, {
       name: editValues.name.trim(),
       type: editValues.type,
+      creditLimitCents:
+        editValues.type === "credit"
+          ? creditLimitInput.amountCents ?? undefined
+          : undefined,
     });
+
+    if (
+      openingBalanceInput.amountCents != null &&
+      openingBalanceInput.amountCents !== 0
+    ) {
+      upsertAccountOpeningBalance(
+        editingId,
+        openingBalanceInput.amountCents,
+        editValues.openingBalanceDate
+      );
+    } else {
+      deleteAccountOpeningBalance(editingId);
+    }
+
     setEditingId(null);
     setEditValues(createAccountFormValues());
   }
@@ -987,7 +464,7 @@ function CategoriesSection(props: CategoriesSectionProps) {
     }));
   }
 
-  function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleCreateSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreateError("");
 
@@ -1020,7 +497,7 @@ function CategoriesSection(props: CategoriesSectionProps) {
     setEditError("");
   }
 
-  function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleEditSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!editingId) {
@@ -1227,7 +704,7 @@ function RecurringRulesSection(props: RecurringRulesSectionProps) {
     }));
   }
 
-  function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleCreateSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreateError("");
 
@@ -1249,7 +726,20 @@ function RecurringRulesSection(props: RecurringRulesSectionProps) {
     setEditError("");
   }
 
-  function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+  function duplicateRule(rule: RecurringRule) {
+    const duplicateValues = createRecurringRuleFormValues(accounts, categories, rule);
+
+    setCreateValues({
+      ...duplicateValues,
+      name: buildDuplicateName(
+        rule.name,
+        recurringRules.map((currentRule) => currentRule.name)
+      ),
+    });
+    setCreateError("");
+  }
+
+  function handleEditSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!editingId) {
@@ -1303,7 +793,7 @@ function RecurringRulesSection(props: RecurringRulesSectionProps) {
         recurring rules ({recurringRules.length})
       </h2>
       <p style={{ margin: "0.35rem 0 1rem", color: "#6b7280", fontSize: "0.9rem" }}>
-        recurring rules stay manual-run. amount sign follows the selected category kind.
+        recurring rules stay manual-run. standard rules follow category sign; transfer rules generate linked transfer pairs.
       </p>
 
       <div style={{ display: "grid", gap: "0.9rem" }}>
@@ -1313,9 +803,18 @@ function RecurringRulesSection(props: RecurringRulesSectionProps) {
           accounts={accounts}
           categories={categories}
           submitLabel="add recurring rule"
-          submitDisabled={accounts.length === 0 || categories.length === 0}
+          submitDisabled={
+            accounts.length === 0 ||
+            (createValues.kind === "standard" && categories.length === 0) ||
+            (createValues.kind === "transfer" && accounts.length < 2)
+          }
           onSubmit={handleCreateSubmit}
           onChange={updateCreateField}
+          onKindChange={(kind) =>
+            setCreateValues((current) =>
+              updateRecurringKind(current, kind, accounts, categories)
+            )
+          }
           onFrequencyChange={(frequency) =>
             setCreateValues((current) => updateRecurringFrequency(current, frequency))
           }
@@ -1324,9 +823,17 @@ function RecurringRulesSection(props: RecurringRulesSectionProps) {
           }
         />
 
-        {accounts.length === 0 || categories.length === 0 ? (
+        {accounts.length === 0 ? (
           <p style={{ margin: 0, color: "#6b7280", fontSize: "0.9rem" }}>
-            add at least one account and one category before saving recurring rules.
+            add at least one account before saving recurring rules.
+          </p>
+        ) : createValues.kind === "standard" && categories.length === 0 ? (
+          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.9rem" }}>
+            add at least one category before saving standard recurring rules.
+          </p>
+        ) : createValues.kind === "transfer" && accounts.length < 2 ? (
+          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.9rem" }}>
+            add at least two accounts before saving recurring transfer rules.
           </p>
         ) : null}
 
@@ -1335,6 +842,11 @@ function RecurringRulesSection(props: RecurringRulesSectionProps) {
             const accountName =
               accounts.find((account) => account.id === rule.accountId)?.name ??
               "unknown account";
+            const toAccountName =
+              rule.kind === "transfer"
+                ? accounts.find((account) => account.id === rule.toAccountId)?.name ??
+                  "unknown account"
+                : null;
             const categoryMatch = categories.find(
               (category) => category.id === rule.categoryId
             );
@@ -1350,9 +862,18 @@ function RecurringRulesSection(props: RecurringRulesSectionProps) {
                   accounts={accounts}
                   categories={categories}
                   submitLabel="save recurring rule"
-                  submitDisabled={accounts.length === 0 || categories.length === 0}
+                  submitDisabled={
+                    accounts.length === 0 ||
+                    (editValues.kind === "standard" && categories.length === 0) ||
+                    (editValues.kind === "transfer" && accounts.length < 2)
+                  }
                   onSubmit={handleEditSubmit}
                   onChange={updateEditField}
+                  onKindChange={(kind) =>
+                    setEditValues((current) =>
+                      updateRecurringKind(current, kind, accounts, categories)
+                    )
+                  }
                   onFrequencyChange={(frequency) =>
                     setEditValues((current) => updateRecurringFrequency(current, frequency))
                   }
@@ -1383,10 +904,12 @@ function RecurringRulesSection(props: RecurringRulesSectionProps) {
                 <div style={{ display: "grid", gap: "0.2rem" }}>
                   <div style={{ fontWeight: 600 }}>{rule.name}</div>
                   <div style={{ color: "#6b7280", fontSize: "0.9rem" }}>
-                    {formatCents(rule.amountCents)} · {getRecurringDetails(rule)}
+                    {rule.kind} · {formatCents(Math.abs(rule.amountCents))} · {getRecurringDetails(rule)}
                   </div>
                   <div style={{ color: "#6b7280", fontSize: "0.9rem" }}>
-                    {accountName} · {categoryMatch?.name ?? "unknown category"} ({categoryMatch?.kind ?? "n/a"})
+                    {rule.kind === "transfer"
+                      ? `${accountName} → ${toAccountName}`
+                      : `${accountName} · ${categoryMatch?.name ?? "unknown category"} (${categoryMatch?.kind ?? "n/a"})`}
                   </div>
                   <div style={{ color: "#6b7280", fontSize: "0.9rem" }}>
                     starts {rule.startDate}
@@ -1406,6 +929,14 @@ function RecurringRulesSection(props: RecurringRulesSectionProps) {
                     style={secondaryButtonStyle}
                   >
                     edit
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => duplicateRule(rule)}
+                    style={secondaryButtonStyle}
+                  >
+                    duplicate
                   </button>
 
                   <button
@@ -1431,6 +962,133 @@ function RecurringRulesSection(props: RecurringRulesSectionProps) {
   );
 }
 
+type DataManagementSectionProps = {
+  accounts: Account[];
+  categories: Category[];
+  transactions: Transaction[];
+  budgets: Budget[];
+  recurringRules: RecurringRule[];
+  replacePersistedState: (state: PersistedState) => void;
+};
+
+function DataManagementSection(props: DataManagementSectionProps) {
+  const {
+    accounts,
+    categories,
+    transactions,
+    budgets,
+    recurringRules,
+    replacePersistedState,
+  } = props;
+  const [importError, setImportError] = useState("");
+  const [importSuccess, setImportSuccess] = useState("");
+
+  function handleExport() {
+    const state = buildPersistedStateSnapshot({
+      accounts,
+      categories,
+      transactions,
+      budgets,
+      recurringRules,
+    });
+    const json = exportPersistedStateJson(state);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = buildBackupFileName();
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    setImportError("");
+    setImportSuccess("");
+
+    if (!file) {
+      return;
+    }
+
+    const raw = await file.text();
+    const result = parsePersistedStateJson(raw);
+
+    if (result.success) {
+      const confirmed = window.confirm(
+        "importing a backup replaces all current data. continue?"
+      );
+
+      if (!confirmed) {
+        event.target.value = "";
+        return;
+      }
+
+      replacePersistedState(result.data);
+      setImportSuccess("backup imported successfully");
+      event.target.value = "";
+      return;
+    }
+
+    setImportError("error" in result ? result.error : "invalid backup file");
+    event.target.value = "";
+  }
+
+  return (
+    <div style={cardStyle}>
+      <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>data management</h2>
+      <p style={{ margin: "0.35rem 0 1rem", color: "#6b7280", fontSize: "0.9rem" }}>
+        export a full json backup or import one to replace all current data after confirmation.
+      </p>
+
+      <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+        <button
+          type="button"
+          onClick={handleExport}
+          style={primaryButtonStyle}
+        >
+          export json backup
+        </button>
+
+        <label
+          style={{
+            ...secondaryButtonStyle,
+            display: "inline-flex",
+            alignItems: "center",
+          }}
+        >
+          import json backup
+          <input
+            type="file"
+            accept="application/json,.json"
+            onChange={handleImport}
+            style={{ display: "none" }}
+          />
+        </label>
+      </div>
+
+      <p style={{ margin: "0.9rem 0 0", color: "#6b7280", fontSize: "0.85rem" }}>
+        import never merges. valid backups replace accounts, categories, transactions, budgets, and recurring rules.
+      </p>
+
+      {importError ? (
+        <p style={{ margin: "0.75rem 0 0", color: "#b91c1c", fontSize: "0.9rem" }}>
+          {importError}
+        </p>
+      ) : null}
+
+      {importSuccess ? (
+        <p style={{ margin: "0.75rem 0 0", color: "#166534", fontSize: "0.9rem" }}>
+          {importSuccess}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const accounts = useAppStore((state) => state.accounts);
   const categories = useAppStore((state) => state.categories);
@@ -1440,6 +1098,12 @@ export function SettingsPage() {
   const addAccount = useAppStore((state) => state.addAccount);
   const updateAccount = useAppStore((state) => state.updateAccount);
   const deleteAccount = useAppStore((state) => state.deleteAccount);
+  const upsertAccountOpeningBalance = useAppStore(
+    (state) => state.upsertAccountOpeningBalance
+  );
+  const deleteAccountOpeningBalance = useAppStore(
+    (state) => state.deleteAccountOpeningBalance
+  );
   const addCategory = useAppStore((state) => state.addCategory);
   const updateCategory = useAppStore((state) => state.updateCategory);
   const deleteCategory = useAppStore((state) => state.deleteCategory);
@@ -1448,6 +1112,7 @@ export function SettingsPage() {
   const addRecurringRule = useAppStore((state) => state.addRecurringRule);
   const updateRecurringRule = useAppStore((state) => state.updateRecurringRule);
   const deleteRecurringRule = useAppStore((state) => state.deleteRecurringRule);
+  const replacePersistedState = useAppStore((state) => state.replacePersistedState);
   const resetSeedData = useAppStore((state) => state.resetSeedData);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
@@ -1467,7 +1132,7 @@ export function SettingsPage() {
   );
 
   const accountRecurringRuleCounts = useMemo(
-    () => countById(recurringRules, (rule) => rule.accountId),
+    () => countRecurringRulesByAccountId(recurringRules),
     [recurringRules]
   );
 
@@ -1501,12 +1166,6 @@ export function SettingsPage() {
     }
 
     if (pendingDelete.entity === "account") {
-      transactions
-        .filter((transaction) => transaction.accountId === pendingDelete.id)
-        .forEach((transaction) => deleteTransaction(transaction.id));
-      recurringRules
-        .filter((rule) => rule.accountId === pendingDelete.id)
-        .forEach((rule) => deleteRecurringRule(rule.id));
       deleteAccount(pendingDelete.id);
     }
 
@@ -1578,12 +1237,24 @@ export function SettingsPage() {
       ) : null}
 
       <div style={{ display: "grid", gap: "1rem" }}>
+        <DataManagementSection
+          accounts={accounts}
+          categories={categories}
+          transactions={transactions}
+          budgets={budgets}
+          recurringRules={recurringRules}
+          replacePersistedState={replacePersistedState}
+        />
+
         <AccountsSection
           accounts={sortedAccounts}
+          transactions={transactions}
           transactionCounts={accountTransactionCounts}
           recurringRuleCounts={accountRecurringRuleCounts}
           addAccount={addAccount}
           updateAccount={updateAccount}
+          upsertAccountOpeningBalance={upsertAccountOpeningBalance}
+          deleteAccountOpeningBalance={deleteAccountOpeningBalance}
           onRequestDelete={(account) =>
             setPendingDelete({
               entity: "account",

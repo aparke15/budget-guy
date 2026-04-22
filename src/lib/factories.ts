@@ -4,7 +4,11 @@ import {
   formatCentsForInput,
   parseAmountInputToCents,
 } from "./money";
-import type { TransactionFormValues } from "../features/types";
+import type {
+  TransferFormInput,
+  TransactionFormInitialState,
+  TransactionFormValues,
+} from "../features/types";
 import type {
   Account,
   AccountType,
@@ -12,6 +16,7 @@ import type {
   Category,
   CategoryKind,
   RecurringFrequency,
+  RecurringRuleKind,
   RecurringRule,
   Transaction,
 } from "../types";
@@ -21,9 +26,31 @@ type CreateTransactionParams = {
   existing?: Transaction;
 };
 
+type CreateTransferTransactionsParams = {
+  input: TransferFormInput;
+  existing?: {
+    transferGroupId?: string;
+    fromTransaction?: Transaction;
+    toTransaction?: Transaction;
+  };
+  metadata?: {
+    source?: "manual" | "recurring";
+    recurringRuleId?: string;
+  };
+};
+
+type CreateOpeningBalanceTransactionParams = {
+  accountId: string;
+  amountCents: number;
+  date: string;
+  note?: string;
+  existing?: Transaction;
+};
+
 type CreateAccountParams = {
   name: string;
   type: AccountType;
+  creditLimitCents?: number;
 };
 
 type CreateCategoryParams = {
@@ -38,20 +65,32 @@ type CreateBudgetParams = {
   plannedCents: number;
 };
 
-type CreateRecurringRuleParams = {
+type BaseRecurringRuleParams = {
   name: string;
   amountCents: number;
   accountId: string;
-  categoryId: string;
   frequency: RecurringFrequency;
   startDate: string;
   endDate?: string;
   active?: boolean;
   dayOfMonth?: number;
   dayOfWeek?: number;
-  merchant?: string;
   note?: string;
 };
+
+type CreateRecurringRuleParams =
+  | (BaseRecurringRuleParams & {
+      kind?: "standard";
+      categoryId: string;
+      merchant?: string;
+      toAccountId?: undefined;
+    })
+  | (BaseRecurringRuleParams & {
+      kind: "transfer";
+      toAccountId: string;
+      categoryId?: undefined;
+      merchant?: undefined;
+    });
 
 function getDefaultCategoryId(
   categories: Category[],
@@ -64,31 +103,66 @@ function getDefaultAccountId(accounts: Account[]): string {
   return accounts[0]?.id ?? "";
 }
 
+function getDefaultTransferDestinationAccountId(accounts: Account[]): string {
+  return accounts[1]?.id ?? accounts[0]?.id ?? "";
+}
+
+export function getDefaultRecurringTransferAccountId(
+  accounts: Account[],
+  fromAccountId: string
+): string {
+  return (
+    accounts.find((account) => account.id !== fromAccountId)?.id ??
+    fromAccountId ??
+    ""
+  );
+}
+
 export function createTransactionFormValues(
   accounts: Account[],
   categories: Category[],
-  existing?: Transaction
+  initialState?: TransactionFormInitialState
 ): TransactionFormValues {
-  if (existing) {
+  if (initialState?.mode === "standard") {
+    const { transaction: existing } = initialState;
+
     return {
       date: existing.date,
-      kind: existing.amountCents >= 0 ? "income" : "expense",
+      entryType: existing.amountCents >= 0 ? "income" : "expense",
       amount: formatCentsForInput(existing.amountCents),
       accountId: existing.accountId,
-      categoryId: existing.categoryId,
+      categoryId: existing.categoryId ?? getDefaultCategoryId(categories, "expense"),
       merchant: existing.merchant ?? "",
       note: existing.note ?? "",
+      fromAccountId: getDefaultAccountId(accounts),
+      toAccountId: getDefaultTransferDestinationAccountId(accounts),
+    };
+  }
+
+  if (initialState?.mode === "transfer") {
+    return {
+      date: initialState.date,
+      entryType: "transfer",
+      amount: formatCentsForInput(initialState.amountCents),
+      accountId: getDefaultAccountId(accounts),
+      categoryId: getDefaultCategoryId(categories, "expense"),
+      merchant: "",
+      note: initialState.note ?? "",
+      fromAccountId: initialState.fromAccountId,
+      toAccountId: initialState.toAccountId,
     };
   }
 
   return {
     date: new Date().toISOString().slice(0, 10),
-    kind: "expense",
+    entryType: "expense",
     amount: "",
     accountId: getDefaultAccountId(accounts),
     categoryId: getDefaultCategoryId(categories, "expense"),
     merchant: "",
     note: "",
+    fromAccountId: getDefaultAccountId(accounts),
+    toAccountId: getDefaultTransferDestinationAccountId(accounts),
   };
 }
 
@@ -104,12 +178,13 @@ export function createTransaction(
 
   const now = getNowIso();
   const amountCents =
-    values.kind === "income"
+    values.entryType === "income"
       ? Math.abs(amountAbsCents)
       : -Math.abs(amountAbsCents);
 
   return {
     id: existing?.id ?? makeId("txn"),
+    kind: "standard",
     date: values.date,
     amountCents,
     accountId: values.accountId,
@@ -118,6 +193,108 @@ export function createTransaction(
     note: values.note.trim() || undefined,
     source: existing?.source ?? "manual",
     recurringRuleId: existing?.recurringRuleId,
+    transferGroupId: undefined,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+}
+
+export function createTransferInput(
+  values: TransactionFormValues
+): TransferFormInput {
+  const amountCents = parseAmountInputToCents(values.amount);
+
+  if (amountCents == null || amountCents <= 0) {
+    throw new Error("amount must be a positive number");
+  }
+
+  if (!values.fromAccountId) {
+    throw new Error("from account is required");
+  }
+
+  if (!values.toAccountId) {
+    throw new Error("to account is required");
+  }
+
+  if (values.fromAccountId === values.toAccountId) {
+    throw new Error("from and to accounts must be different");
+  }
+
+  return {
+    date: values.date,
+    fromAccountId: values.fromAccountId,
+    toAccountId: values.toAccountId,
+    amountCents: Math.abs(amountCents),
+    note: values.note.trim() || undefined,
+  };
+}
+
+export function createTransferTransactions(
+  params: CreateTransferTransactionsParams
+): [Transaction, Transaction] {
+  const { input, existing, metadata } = params;
+
+  if (input.amountCents <= 0 || !Number.isInteger(input.amountCents)) {
+    throw new Error("amount must be a positive number");
+  }
+
+  if (input.fromAccountId === input.toAccountId) {
+    throw new Error("from and to accounts must be different");
+  }
+
+  const now = getNowIso();
+  const transferGroupId = existing?.transferGroupId ?? makeId("transfer");
+  const source = metadata?.source ?? "manual";
+
+  return [
+    {
+      id: existing?.fromTransaction?.id ?? makeId("txn"),
+      kind: "transfer",
+      date: input.date,
+      amountCents: -Math.abs(input.amountCents),
+      accountId: input.fromAccountId,
+      note: input.note,
+      source,
+      recurringRuleId: metadata?.recurringRuleId,
+      transferGroupId,
+      createdAt: existing?.fromTransaction?.createdAt ?? now,
+      updatedAt: now,
+    },
+    {
+      id: existing?.toTransaction?.id ?? makeId("txn"),
+      kind: "transfer",
+      date: input.date,
+      amountCents: Math.abs(input.amountCents),
+      accountId: input.toAccountId,
+      note: input.note,
+      source,
+      recurringRuleId: metadata?.recurringRuleId,
+      transferGroupId,
+      createdAt: existing?.toTransaction?.createdAt ?? now,
+      updatedAt: now,
+    },
+  ];
+}
+
+export function createOpeningBalanceTransaction(
+  params: CreateOpeningBalanceTransactionParams
+): Transaction {
+  const { accountId, amountCents, date, note, existing } = params;
+
+  if (!Number.isInteger(amountCents) || amountCents === 0) {
+    throw new Error("amount must be a non-zero integer number of cents");
+  }
+
+  const now = getNowIso();
+
+  return {
+    id: existing?.id ?? makeId("txn"),
+    kind: "opening-balance",
+    date,
+    amountCents,
+    accountId,
+    note: note?.trim() || undefined,
+    source: "manual",
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -130,6 +307,8 @@ export function createAccount(params: CreateAccountParams): Account {
     id: makeId("acct"),
     name: params.name.trim(),
     type: params.type,
+    creditLimitCents:
+      params.type === "credit" ? params.creditLimitCents : undefined,
     createdAt: now,
     updatedAt: now,
   };
@@ -165,14 +344,21 @@ export function createRecurringRule(
   params: CreateRecurringRuleParams
 ): RecurringRule {
   const now = getNowIso();
+  const kind: RecurringRuleKind = params.kind ?? "standard";
 
   return {
     id: makeId("rule"),
+    kind,
     name: params.name.trim(),
-    amountCents: params.amountCents,
+    amountCents:
+      kind === "transfer"
+        ? Math.abs(params.amountCents)
+        : params.amountCents,
     accountId: params.accountId,
-    categoryId: params.categoryId,
-    merchant: params.merchant?.trim() || undefined,
+    toAccountId: kind === "transfer" ? params.toAccountId : undefined,
+    categoryId: kind === "standard" ? params.categoryId : undefined,
+    merchant:
+      kind === "standard" ? params.merchant?.trim() || undefined : undefined,
     note: params.note?.trim() || undefined,
     frequency: params.frequency,
     startDate: params.startDate,

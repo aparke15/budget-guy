@@ -22,6 +22,10 @@ export function formatCentsForInput(amountCents: number): string {
   return (Math.abs(amountCents) / 100).toFixed(2);
 }
 
+export function formatSignedCentsForInput(amountCents: number): string {
+  return (amountCents / 100).toFixed(2);
+}
+
 export function parseAmountInputToCents(input: string): number | null {
   const normalized = input.replace(/[$,\s]/g, "").trim();
 
@@ -46,6 +50,7 @@ export function sumIncomeCents(
     .filter(
       (transaction) =>
         getMonthKey(transaction.date) === month &&
+        transaction.kind === "standard" &&
         transaction.amountCents > 0
     )
     .reduce((sum, transaction) => sum + transaction.amountCents, 0);
@@ -59,6 +64,7 @@ export function sumExpenseCents(
     .filter(
       (transaction) =>
         getMonthKey(transaction.date) === month &&
+        transaction.kind === "standard" &&
         transaction.amountCents < 0
     )
     .reduce((sum, transaction) => sum + Math.abs(transaction.amountCents), 0);
@@ -73,6 +79,7 @@ export function sumCategoryActualCents(
     .filter(
       (transaction) =>
         getMonthKey(transaction.date) === month &&
+        transaction.kind === "standard" &&
         transaction.categoryId === categoryId &&
         transaction.amountCents < 0
     )

@@ -8,6 +8,7 @@ import {
   getDaysInMonth,
   isAfter,
   isBefore,
+  isValid,
   parseISO,
   startOfMonth,
 } from "date-fns";
@@ -42,6 +43,24 @@ export function getMonthlyOccurrenceDate(
   candidate.setDate(safeDay);
 
   return format(candidate, "yyyy-MM-dd");
+}
+
+export function getYearlyOccurrenceDate(
+  month: string,
+  startDate: string
+): string | null {
+  if (month.slice(5, 7) !== startDate.slice(5, 7)) {
+    return null;
+  }
+
+  const candidateDate = `${month.slice(0, 4)}-${startDate.slice(5, 10)}`;
+  const parsed = parseISO(candidateDate);
+
+  if (!isValid(parsed) || format(parsed, "yyyy-MM-dd") !== candidateDate) {
+    return null;
+  }
+
+  return candidateDate;
 }
 
 export function isDateWithinBounds(
@@ -106,11 +125,43 @@ export function generateOccurrencesForMonth(
     ) {
       occurrences.push({
         recurringRuleId: rule.id,
+        kind: rule.kind,
         date,
-        amountCents: rule.amountCents,
+        amountCents:
+          rule.kind === "transfer"
+            ? Math.abs(rule.amountCents)
+            : rule.amountCents,
         accountId: rule.accountId,
+        toAccountId: rule.toAccountId,
         categoryId: rule.categoryId,
-        merchant: rule.merchant,
+        merchant: rule.kind === "standard" ? rule.merchant : undefined,
+        note: rule.note,
+      });
+    }
+
+    return occurrences;
+  }
+
+  if (rule.frequency === "yearly") {
+    const date = getYearlyOccurrenceDate(month, rule.startDate);
+
+    if (
+      date &&
+      isDateWithinBounds(date, rule.startDate, rule.endDate) &&
+      !existingDates.has(date)
+    ) {
+      occurrences.push({
+        recurringRuleId: rule.id,
+        kind: rule.kind,
+        date,
+        amountCents:
+          rule.kind === "transfer"
+            ? Math.abs(rule.amountCents)
+            : rule.amountCents,
+        accountId: rule.accountId,
+        toAccountId: rule.toAccountId,
+        categoryId: rule.categoryId,
+        merchant: rule.kind === "standard" ? rule.merchant : undefined,
         note: rule.note,
       });
     }
@@ -152,11 +203,14 @@ export function generateOccurrencesForMonth(
 
     occurrences.push({
       recurringRuleId: rule.id,
+      kind: rule.kind,
       date,
-      amountCents: rule.amountCents,
+      amountCents:
+        rule.kind === "transfer" ? Math.abs(rule.amountCents) : rule.amountCents,
       accountId: rule.accountId,
+      toAccountId: rule.toAccountId,
       categoryId: rule.categoryId,
-      merchant: rule.merchant,
+      merchant: rule.kind === "standard" ? rule.merchant : undefined,
       note: rule.note,
     });
   }

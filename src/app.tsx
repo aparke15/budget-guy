@@ -68,6 +68,18 @@ export default function App() {
               )}
             </NavLink>
 
+            <NavLink to="/accounts">
+              {({ isActive }) => (
+                <span style={getNavLinkStyle(isActive)}>accounts</span>
+              )}
+            </NavLink>
+
+            <NavLink to="/forecast">
+              {({ isActive }) => (
+                <span style={getNavLinkStyle(isActive)}>forecast</span>
+              )}
+            </NavLink>
+
             <NavLink to="/budget">
               {({ isActive }) => (
                 <span style={getNavLinkStyle(isActive)}>budget</span>
