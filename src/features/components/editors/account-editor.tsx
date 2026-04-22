@@ -19,16 +19,10 @@ export function AccountEditor(props: AccountEditorProps) {
   const { values, error, submitLabel, onSubmit, onChange, onCancel } = props;
 
   return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: "0.75rem" }}>
-      <div
-        style={{
-          display: "grid",
-          gap: "0.75rem",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        }}
-      >
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>name</span>
+    <form onSubmit={onSubmit} className="stack-sm">
+      <div className="form-grid">
+        <label className="field">
+          <span className="field__label">name</span>
           <input
             type="text"
             value={values.name}
@@ -37,8 +31,8 @@ export function AccountEditor(props: AccountEditorProps) {
           />
         </label>
 
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>type</span>
+        <label className="field">
+          <span className="field__label">type</span>
           <select
             value={values.type}
             onChange={(event) =>
@@ -54,10 +48,8 @@ export function AccountEditor(props: AccountEditorProps) {
         </label>
 
         {values.type === "credit" ? (
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              credit limit
-            </span>
+          <label className="field">
+            <span className="field__label">credit limit</span>
             <input
               type="text"
               inputMode="decimal"
@@ -69,10 +61,8 @@ export function AccountEditor(props: AccountEditorProps) {
           </label>
         ) : null}
 
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-            opening balance
-          </span>
+        <label className="field">
+          <span className="field__label">opening balance</span>
           <input
             type="text"
             inputMode="decimal"
@@ -83,10 +73,8 @@ export function AccountEditor(props: AccountEditorProps) {
           />
         </label>
 
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-            opening balance date
-          </span>
+        <label className="field">
+          <span className="field__label">opening balance date</span>
           <input
             type="date"
             value={values.openingBalanceDate}
@@ -97,12 +85,10 @@ export function AccountEditor(props: AccountEditorProps) {
       </div>
 
       {error ? (
-        <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem" }}>
-          {error}
-        </p>
+        <p className="message message--error">{error}</p>
       ) : null}
 
-      <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+      <div className="button-row">
         <button type="submit" style={primaryButtonStyle}>
           {submitLabel}
         </button>

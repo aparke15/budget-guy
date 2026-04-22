@@ -1,10 +1,11 @@
-import { createBrowserRouter } from "react-router-dom";
+import { Navigate, createBrowserRouter } from "react-router-dom";
 
 import App from "../app";
 import { AccountsPage } from "../features/accounts/accounts-page";
 import { BudgetPage } from "../features/budgets/budget-page";
 import { DashboardPage } from "../features/dashboard/dashboard-page";
 import { ForecastPage } from "../features/forecast/forecast-page";
+import { RecurringPage } from "../features/recurring/recurring-page";
 import { SettingsPage } from "../features/settings/settings-page";
 import { TransactionsPage } from "../features/transactions/transactions-page";
 
@@ -26,12 +27,20 @@ export const router = createBrowserRouter([
         element: <AccountsPage />,
       },
       {
-        path: "forecast",
-        element: <ForecastPage />,
+        path: "budgets",
+        element: <BudgetPage />,
       },
       {
         path: "budget",
-        element: <BudgetPage />,
+        element: <Navigate to="/budgets" replace />,
+      },
+      {
+        path: "recurring",
+        element: <RecurringPage />,
+      },
+      {
+        path: "forecast",
+        element: <ForecastPage />,
       },
       {
         path: "settings",

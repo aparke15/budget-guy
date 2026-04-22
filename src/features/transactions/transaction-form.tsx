@@ -6,6 +6,12 @@ import {
   createTransactionFormValues,
 } from "../../lib/factories";
 import { parseAmountInputToCents } from "../../lib/money";
+import {
+  inputStyle,
+  primaryButtonStyle,
+  secondaryButtonStyle,
+  textAreaStyle,
+} from "../components/style-constants";
 import type { TransactionFormProps, TransactionFormValues } from "../types";
 
 export function TransactionForm(props: TransactionFormProps) {
@@ -159,22 +165,10 @@ export function TransactionForm(props: TransactionFormProps) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        display: "grid",
-        gap: "0.9rem",
-      }}
-    >
-      <div
-        style={{
-          display: "grid",
-          gap: "0.9rem",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        }}
-      >
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>type</span>
+    <form onSubmit={handleSubmit} className="stack-sm">
+      <div className="form-grid">
+        <label className="field">
+          <span className="field__label">type</span>
           <select
             value={values.entryType}
             onChange={(event) =>
@@ -182,12 +176,7 @@ export function TransactionForm(props: TransactionFormProps) {
                 event.target.value as "income" | "expense" | "transfer"
               )
             }
-            style={{
-              padding: "0.55rem 0.7rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #d1d5db",
-              background: "#ffffff",
-            }}
+            style={inputStyle}
           >
             <option value="expense">expense</option>
             <option value="income">income</option>
@@ -195,8 +184,8 @@ export function TransactionForm(props: TransactionFormProps) {
           </select>
         </label>
 
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>amount</span>
+        <label className="field">
+          <span className="field__label">amount</span>
           <input
             type="text"
             inputMode="decimal"
@@ -210,45 +199,28 @@ export function TransactionForm(props: TransactionFormProps) {
                   : event.target.value
               )
             }
-            style={{
-              padding: "0.55rem 0.7rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #d1d5db",
-              background: "#ffffff",
-            }}
+            style={inputStyle}
           />
         </label>
 
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>date</span>
+        <label className="field">
+          <span className="field__label">date</span>
           <input
             type="date"
             value={values.date}
             onChange={(event) => updateField("date", event.target.value)}
-            style={{
-              padding: "0.55rem 0.7rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #d1d5db",
-              background: "#ffffff",
-            }}
+            style={inputStyle}
           />
         </label>
 
         {isTransferMode ? (
           <>
-            <label style={{ display: "grid", gap: "0.35rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-                from account
-              </span>
+            <label className="field">
+              <span className="field__label">from account</span>
               <select
                 value={values.fromAccountId}
                 onChange={(event) => updateField("fromAccountId", event.target.value)}
-                style={{
-                  padding: "0.55rem 0.7rem",
-                  borderRadius: "0.5rem",
-                  border: "1px solid #d1d5db",
-                  background: "#ffffff",
-                }}
+                style={inputStyle}
               >
                 <option value="">select account</option>
                 {accounts.map((account) => (
@@ -259,19 +231,12 @@ export function TransactionForm(props: TransactionFormProps) {
               </select>
             </label>
 
-            <label style={{ display: "grid", gap: "0.35rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-                to account
-              </span>
+            <label className="field">
+              <span className="field__label">to account</span>
               <select
                 value={values.toAccountId}
                 onChange={(event) => updateField("toAccountId", event.target.value)}
-                style={{
-                  padding: "0.55rem 0.7rem",
-                  borderRadius: "0.5rem",
-                  border: "1px solid #d1d5db",
-                  background: "#ffffff",
-                }}
+                style={inputStyle}
               >
                 <option value="">select account</option>
                 {accounts.map((account) => (
@@ -284,17 +249,12 @@ export function TransactionForm(props: TransactionFormProps) {
           </>
         ) : (
           <>
-            <label style={{ display: "grid", gap: "0.35rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "#374151" }}>account</span>
+            <label className="field">
+              <span className="field__label">account</span>
               <select
                 value={values.accountId}
                 onChange={(event) => updateField("accountId", event.target.value)}
-                style={{
-                  padding: "0.55rem 0.7rem",
-                  borderRadius: "0.5rem",
-                  border: "1px solid #d1d5db",
-                  background: "#ffffff",
-                }}
+                style={inputStyle}
               >
                 <option value="">select account</option>
                 {accounts.map((account) => (
@@ -305,19 +265,12 @@ export function TransactionForm(props: TransactionFormProps) {
               </select>
             </label>
 
-            <label style={{ display: "grid", gap: "0.35rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-                category
-              </span>
+            <label className="field">
+              <span className="field__label">category</span>
               <select
                 value={values.categoryId}
                 onChange={(event) => updateField("categoryId", event.target.value)}
-                style={{
-                  padding: "0.55rem 0.7rem",
-                  borderRadius: "0.5rem",
-                  border: "1px solid #d1d5db",
-                  background: "#ffffff",
-                }}
+                style={inputStyle}
               >
                 <option value="">select category</option>
                 {matchingCategories.map((category) => (
@@ -328,73 +281,41 @@ export function TransactionForm(props: TransactionFormProps) {
               </select>
             </label>
 
-            <label style={{ display: "grid", gap: "0.35rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-                merchant
-              </span>
+            <label className="field">
+              <span className="field__label">merchant</span>
               <input
                 type="text"
                 value={values.merchant}
                 onChange={(event) => updateField("merchant", event.target.value)}
-                style={{
-                  padding: "0.55rem 0.7rem",
-                  borderRadius: "0.5rem",
-                  border: "1px solid #d1d5db",
-                  background: "#ffffff",
-                }}
+                style={inputStyle}
               />
             </label>
           </>
         )}
       </div>
 
-      <label style={{ display: "grid", gap: "0.35rem" }}>
-        <span style={{ fontSize: "0.9rem", color: "#374151" }}>note</span>
+      <label className="field">
+        <span className="field__label">note</span>
         <textarea
           rows={3}
           value={values.note}
           onChange={(event) => updateField("note", event.target.value)}
-          style={{
-            padding: "0.7rem",
-            borderRadius: "0.5rem",
-            border: "1px solid #d1d5db",
-            background: "#ffffff",
-            resize: "vertical",
-          }}
+          style={textAreaStyle}
         />
       </label>
 
       {error ? (
-        <div
-          style={{
-            padding: "0.7rem 0.85rem",
-            borderRadius: "0.5rem",
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            color: "#991b1b",
-          }}
-        >
+        <div className="message-box message-box--error">
           {error}
         </div>
       ) : null}
 
-      <div
-        style={{
-          display: "flex",
-          gap: "0.75rem",
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="button-row">
         <button
           type="submit"
           disabled={transferSubmitDisabled}
           style={{
-            padding: "0.7rem 0.95rem",
-            borderRadius: "0.5rem",
-            border: "1px solid #d1d5db",
-            background: "#111827",
-            color: "#ffffff",
+            ...primaryButtonStyle,
             cursor: transferSubmitDisabled ? "not-allowed" : "pointer",
             opacity: transferSubmitDisabled ? 0.7 : 1,
           }}
@@ -403,18 +324,7 @@ export function TransactionForm(props: TransactionFormProps) {
         </button>
 
         {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            style={{
-              padding: "0.7rem 0.95rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #d1d5db",
-              background: "#ffffff",
-              color: "#111827",
-              cursor: "pointer",
-            }}
-          >
+          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
             cancel
           </button>
         ) : null}

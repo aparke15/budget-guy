@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { useAppStore } from "../../app/store";
-import { cardStyle, inputStyle } from "../components/style-constants";
+import { inputStyle } from "../components/style-constants";
 import { buildForecast, type ForecastHorizon } from "../../lib/forecast";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents } from "../../lib/money";
@@ -30,16 +30,19 @@ export function ForecastPage() {
 
   if (accounts.length === 0) {
     return (
-      <section style={{ display: "grid", gap: "1.25rem" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>forecast</h1>
-          <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
+      <section className="page">
+        <div className="page-header">
+          <div className="page-title-group">
+            <h1 className="page-title">forecast</h1>
+            <p className="page-subtitle">
             projected from actual balances plus future recurring activity only.
           </p>
         </div>
 
-        <div style={cardStyle}>
-          <p style={{ margin: 0, color: "#6b7280" }}>
+        </div>
+
+        <div className="section-card">
+          <p className="empty-state">
             no accounts yet. add accounts and recurring rules to see a forecast.
           </p>
         </div>
@@ -48,26 +51,18 @@ export function ForecastPage() {
   }
 
   return (
-    <section style={{ display: "grid", gap: "1.25rem" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-          alignItems: "end",
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>forecast</h1>
-          <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
+    <section className="page">
+      <div className="page-header">
+        <div className="page-title-group">
+          <h1 className="page-title">forecast</h1>
+          <p className="page-subtitle">
             projected values only. no budgets, no guesses, just future recurring activity.
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-          <label style={{ display: "grid", gap: "0.35rem", fontSize: "0.9rem", color: "#374151" }}>
-            starting month
+        <div className="page-actions">
+          <label className="field">
+            <span className="field__label">starting month</span>
             <input
               type="month"
               min={getCurrentMonth()}
@@ -77,8 +72,8 @@ export function ForecastPage() {
             />
           </label>
 
-          <label style={{ display: "grid", gap: "0.35rem", fontSize: "0.9rem", color: "#374151" }}>
-            horizon
+          <label className="field">
+            <span className="field__label">horizon</span>
             <select
               value={horizon}
               onChange={(event) => setHorizon(event.target.value as ForecastHorizon)}
@@ -92,21 +87,38 @@ export function ForecastPage() {
         </div>
       </div>
 
+      <div className="summary-grid">
+        <div className="summary-card">
+          <div className="summary-card__label">accounts</div>
+          <div className="summary-card__value">{accounts.length}</div>
+        </div>
+        <div className="summary-card summary-card--good">
+          <div className="summary-card__label">active recurring rules</div>
+          <div className="summary-card__value">
+            {recurringRules.filter((rule) => rule.active).length}
+          </div>
+        </div>
+        <div className="summary-card summary-card--info">
+          <div className="summary-card__label">forecast months</div>
+          <div className="summary-card__value">{forecast.months.length}</div>
+        </div>
+      </div>
+
       {recurringRules.length === 0 ? (
-        <div style={cardStyle}>
-          <p style={{ margin: 0, color: "#6b7280" }}>
+        <div className="section-card">
+          <p className="empty-state">
             no recurring rules yet. projected summaries stay flat and projected balances match current balances.
           </p>
         </div>
       ) : null}
 
-      <div style={cardStyle}>
-        <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>monthly projected summary</h2>
+      <div className="section-card">
+        <h2 className="section-title">monthly projected summary</h2>
 
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="table-wrap">
+          <table className="app-table">
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
+              <tr>
                 <th style={tableCellStyle}>month</th>
                 <th style={tableCellStyle}>projected income</th>
                 <th style={tableCellStyle}>projected expenses</th>
@@ -139,15 +151,13 @@ export function ForecastPage() {
         </div>
       </div>
 
-      <div style={cardStyle}>
-        <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>
-          projected account ending balances
-        </h2>
+      <div className="section-card">
+        <h2 className="section-title">projected account ending balances</h2>
 
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="table-wrap">
+          <table className="app-table">
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
+              <tr>
                 <th style={tableCellStyle}>account</th>
                 <th style={tableCellStyle}>type</th>
                 {forecast.months.map((month) => (
@@ -161,7 +171,17 @@ export function ForecastPage() {
               {forecast.accountBalanceRows.map((row) => (
                 <tr key={row.accountId} style={{ borderBottom: "1px solid #f3f4f6" }}>
                   <td style={{ ...tableCellStyle, fontWeight: 600 }}>{row.accountName}</td>
-                  <td style={tableCellStyle}>{row.accountType}</td>
+                  <td style={tableCellStyle}>
+                    <span
+                      className={
+                        row.accountType === "credit"
+                          ? "badge badge--credit"
+                          : "badge badge--neutral"
+                      }
+                    >
+                      {row.accountType}
+                    </span>
+                  </td>
                   {row.projectedBalances.map((balancePoint) => (
                     <td key={balancePoint.month} style={tableCellStyle}>
                       {row.accountType === "credit" ? (
