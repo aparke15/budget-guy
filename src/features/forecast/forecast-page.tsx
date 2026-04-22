@@ -30,16 +30,16 @@ export function ForecastPage() {
 
   if (accounts.length === 0) {
     return (
-      <section style={{ display: "grid", gap: "1.25rem" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>forecast</h1>
-          <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
-            projected from actual balances plus future recurring activity only.
-          </p>
+      <section className="page">
+        <div className="page-header">
+          <div className="page-header-text">
+            <h1>forecast</h1>
+            <p>projected from actual balances plus future recurring activity only.</p>
+          </div>
         </div>
 
         <div style={cardStyle}>
-          <p style={{ margin: 0, color: "#6b7280" }}>
+          <p className="empty-state">
             no accounts yet. add accounts and recurring rules to see a forecast.
           </p>
         </div>
@@ -48,26 +48,16 @@ export function ForecastPage() {
   }
 
   return (
-    <section style={{ display: "grid", gap: "1.25rem" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-          alignItems: "end",
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>forecast</h1>
-          <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
-            projected values only. no budgets, no guesses, just future recurring activity.
-          </p>
+    <section className="page">
+      <div className="page-header">
+        <div className="page-header-text">
+          <h1>forecast</h1>
+          <p>projected values only. no budgets, no guesses, just future recurring activity.</p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-          <label style={{ display: "grid", gap: "0.35rem", fontSize: "0.9rem", color: "#374151" }}>
-            starting month
+        <div className="page-actions">
+          <label className="field" style={{ gap: "0.25rem" }}>
+            <span>starting month</span>
             <input
               type="month"
               min={getCurrentMonth()}
@@ -77,8 +67,8 @@ export function ForecastPage() {
             />
           </label>
 
-          <label style={{ display: "grid", gap: "0.35rem", fontSize: "0.9rem", color: "#374151" }}>
-            horizon
+          <label className="field" style={{ gap: "0.25rem" }}>
+            <span>horizon</span>
             <select
               value={horizon}
               onChange={(event) => setHorizon(event.target.value as ForecastHorizon)}
@@ -100,13 +90,13 @@ export function ForecastPage() {
         </div>
       ) : null}
 
-      <div style={cardStyle}>
-        <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>monthly projected summary</h2>
+      <div className="section-card">
+        <h2>monthly projected summary</h2>
 
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="data-table">
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
+              <tr>
                 <th style={tableCellStyle}>month</th>
                 <th style={tableCellStyle}>projected income</th>
                 <th style={tableCellStyle}>projected expenses</th>
@@ -139,15 +129,13 @@ export function ForecastPage() {
         </div>
       </div>
 
-      <div style={cardStyle}>
-        <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>
-          projected account ending balances
-        </h2>
+      <div className="section-card">
+        <h2>projected account ending balances</h2>
 
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="data-table">
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
+              <tr>
                 <th style={tableCellStyle}>account</th>
                 <th style={tableCellStyle}>type</th>
                 {forecast.months.map((month) => (

@@ -188,57 +188,28 @@ export function BudgetPage() {
   }
 
   return (
-    <section style={{ display: "grid", gap: "1.25rem" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-          alignItems: "end",
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>budget</h1>
-          <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
-            planned vs actual. now with agency.
-          </p>
+    <section className="page">
+      <div className="page-header">
+        <div className="page-header-text">
+          <h1>budget</h1>
+          <p>planned vs actual. now with agency.</p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <label
-            style={{
-              display: "grid",
-              gap: "0.35rem",
-              fontSize: "0.9rem",
-              color: "#374151",
-            }}
-          >
+        <div className="page-actions">
+          <label style={{ display: "grid", gap: "0.35rem", fontSize: "0.9rem", color: "#374151" }}>
             month
             <input
               type="month"
               value={month}
               onChange={(event) => setMonth(event.target.value)}
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              style={{ padding: "0.55rem 0.7rem", borderRadius: "0.5rem", border: "1px solid #d1d5db", background: "#ffffff" }}
             />
           </label>
 
           <button
             type="button"
             onClick={saveAllBudgets}
-            style={{
-              padding: "0.7rem 0.95rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #d1d5db",
-              background: "#111827",
-              color: "#ffffff",
-              cursor: "pointer",
-            }}
+            style={{ padding: "0.7rem 0.95rem", borderRadius: "0.5rem", border: "1px solid #d1d5db", background: "#111827", color: "#ffffff", cursor: "pointer" }}
           >
             save all budgets
           </button>
