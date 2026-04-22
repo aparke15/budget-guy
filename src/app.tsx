@@ -1,107 +1,49 @@
 import { NavLink, Outlet } from "react-router-dom";
 
-function getNavLinkStyle(isActive: boolean): React.CSSProperties {
-  return {
-    padding: "0.5rem 0.75rem",
-    borderRadius: "0.5rem",
-    textDecoration: "none",
-    color: isActive ? "#111827" : "#4b5563",
-    background: isActive ? "#e5e7eb" : "transparent",
-    fontWeight: isActive ? 600 : 500,
-  };
-}
+import "./app.css";
+
+const navItems: Array<{ to: string; label: string; end?: boolean }> = [
+  { to: "/", label: "dashboard", end: true },
+  { to: "/transactions", label: "transactions" },
+  { to: "/budgets", label: "budgets" },
+  { to: "/accounts", label: "accounts" },
+  { to: "/recurring", label: "recurring" },
+  { to: "/forecast", label: "forecast" },
+  { to: "/settings", label: "settings" },
+];
 
 export default function App() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#f9fafb",
-        color: "#111827",
-        fontFamily:
-          "Inter, ui-sans-serif, system-ui, -apple-system, sans-serif",
-      }}
-    >
-      <header
-        style={{
-          borderBottom: "1px solid #e5e7eb",
-          background: "#ffffff",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "1100px",
-            margin: "0 auto",
-            padding: "1rem 1.25rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "1rem",
-          }}
-        >
-          <div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>
-              budget mvp
-            </div>
-            <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-header__content">
+          <div className="app-brand">
+            <div className="app-brand__title">budget mvp</div>
+            <div className="app-brand__subtitle">
               local-first and gloriously unbank-synced
             </div>
           </div>
 
-          <nav
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              flexWrap: "wrap",
-            }}
-          >
-            <NavLink to="/" end>
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>dashboard</span>
-              )}
-            </NavLink>
-
-            <NavLink to="/transactions">
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>transactions</span>
-              )}
-            </NavLink>
-
-            <NavLink to="/accounts">
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>accounts</span>
-              )}
-            </NavLink>
-
-            <NavLink to="/forecast">
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>forecast</span>
-              )}
-            </NavLink>
-
-            <NavLink to="/budget">
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>budget</span>
-              )}
-            </NavLink>
-
-            <NavLink to="/settings">
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>settings</span>
-              )}
-            </NavLink>
+          <nav className="app-nav">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  isActive
+                    ? "app-nav__link app-nav__link--active"
+                    : "app-nav__link"
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
           </nav>
         </div>
       </header>
 
-      <main
-        style={{
-          maxWidth: "1100px",
-          margin: "0 auto",
-          padding: "1.5rem 1.25rem 3rem",
-        }}
-      >
+      <main className="app-main">
         <Outlet />
       </main>
     </div>

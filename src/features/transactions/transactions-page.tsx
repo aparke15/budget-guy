@@ -3,6 +3,13 @@ import { useMemo, useState } from "react";
 import { useAppStore } from "../../app/store";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents } from "../../lib/money";
+import {
+  compactDangerButtonStyle,
+  compactSecondaryButtonStyle,
+  inputStyle,
+  primaryButtonStyle,
+  secondaryButtonStyle,
+} from "../components/style-constants";
 import type { TransactionFormSubmission } from "../types";
 import { TransactionForm } from "./transaction-form";
 import {
@@ -114,33 +121,18 @@ export function TransactionsPage() {
   }
 
   return (
-    <section style={{ display: "grid", gap: "1.25rem" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-          alignItems: "end",
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>transactions</h1>
-          <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
+    <section className="page">
+      <div className="page-header">
+        <div className="page-title-group">
+          <h1 className="page-title">transactions</h1>
+          <p className="page-subtitle">
             ledger first. glamour later.
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <label
-            style={{
-              display: "grid",
-              gap: "0.35rem",
-              fontSize: "0.9rem",
-              color: "#374151",
-            }}
-          >
-            month
+        <div className="page-actions">
+          <label className="field">
+            <span className="field__label">month</span>
             <input
               type="month"
               value={filters.month}
@@ -150,12 +142,7 @@ export function TransactionsPage() {
                   month: event.target.value,
                 }))
               }
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              style={inputStyle}
             />
           </label>
 
@@ -165,14 +152,7 @@ export function TransactionsPage() {
               setShowCreateForm((current) => !current);
               setEditingId(null);
             }}
-            style={{
-              padding: "0.7rem 0.95rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #d1d5db",
-              background: "#111827",
-              color: "#ffffff",
-              cursor: "pointer",
-            }}
+            style={primaryButtonStyle}
           >
             {showCreateForm ? "hide form" : "add transaction"}
           </button>
@@ -180,17 +160,8 @@ export function TransactionsPage() {
       </div>
 
       {showCreateForm ? (
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.75rem",
-            padding: "1rem",
-          }}
-        >
-          <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>
-            new transaction
-          </h2>
+        <div className="section-card">
+          <h2 className="section-title">new transaction</h2>
 
           <TransactionForm
             accounts={accounts}
@@ -203,17 +174,8 @@ export function TransactionsPage() {
       ) : null}
 
       {editingTransaction ? (
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.75rem",
-            padding: "1rem",
-          }}
-        >
-          <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>
-            edit transaction
-          </h2>
+        <div className="section-card">
+          <h2 className="section-title">edit transaction</h2>
 
           <TransactionForm
             accounts={accounts}
@@ -243,32 +205,21 @@ export function TransactionsPage() {
         </div>
       ) : null}
 
-      <div
-        style={{
-          background: "#ffffff",
-          border: "1px solid #e5e7eb",
-          borderRadius: "0.75rem",
-          padding: "1rem",
-        }}
-      >
-        <div style={{ marginBottom: "0.9rem", color: "#6b7280" }}>
+      <div className="section-card">
+        <div className="section-header">
+          <div className="section-title-group">
+            <h2 className="section-title">ledger</h2>
+            <p className="section-subtitle">
           {filteredTransactions.length} transaction
           {filteredTransactions.length === 1 ? "" : "s"} in {filters.month}
           {hasActiveFilters ? " matching current filters" : ""}
+            </p>
+          </div>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gap: "0.9rem",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            marginBottom: "1rem",
-          }}
-        >
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              account
-            </span>
+        <div className="toolbar" style={{ marginBottom: "1rem" }}>
+          <label className="field">
+            <span className="field__label">account</span>
             <select
               value={filters.accountId ?? ""}
               onChange={(event) =>
@@ -277,12 +228,7 @@ export function TransactionsPage() {
                   accountId: event.target.value || null,
                 }))
               }
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              style={inputStyle}
             >
               <option value="">all accounts</option>
               {accounts.map((account) => (
@@ -293,10 +239,8 @@ export function TransactionsPage() {
             </select>
           </label>
 
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              category
-            </span>
+          <label className="field">
+            <span className="field__label">category</span>
             <select
               value={filters.categoryId ?? ""}
               onChange={(event) =>
@@ -305,12 +249,7 @@ export function TransactionsPage() {
                   categoryId: event.target.value || null,
                 }))
               }
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              style={inputStyle}
             >
               <option value="">all categories</option>
               {categories.map((category) => (
@@ -321,10 +260,8 @@ export function TransactionsPage() {
             </select>
           </label>
 
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              search
-            </span>
+          <label className="field">
+            <span className="field__label">search</span>
             <input
               type="text"
               value={filters.search}
@@ -335,21 +272,11 @@ export function TransactionsPage() {
                 }))
               }
               placeholder="merchant or note"
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              style={inputStyle}
             />
           </label>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "end",
-            }}
-          >
+          <div className="button-row" style={{ alignItems: "end" }}>
             <button
               type="button"
               onClick={() =>
@@ -362,11 +289,7 @@ export function TransactionsPage() {
               }
               disabled={!hasActiveFilters}
               style={{
-                padding: "0.7rem 0.95rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-                color: "#111827",
+                ...secondaryButtonStyle,
                 cursor: hasActiveFilters ? "pointer" : "not-allowed",
                 opacity: hasActiveFilters ? 1 : 0.6,
               }}
@@ -376,55 +299,73 @@ export function TransactionsPage() {
           </div>
         </div>
 
-        <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-            }}
-          >
+        <div className="table-wrap">
+          <table className="app-table">
             <thead>
-              <tr
-                style={{
-                  textAlign: "left",
-                  borderBottom: "1px solid #e5e7eb",
-                }}
-              >
-                <th style={{ padding: "0.65rem 0.5rem" }}>date</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>details</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>category</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>account</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>source</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>amount</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>note</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>actions</th>
+              <tr>
+                <th>date</th>
+                <th>details</th>
+                <th>category</th>
+                <th>account</th>
+                <th>badges</th>
+                <th>amount</th>
+                <th>note</th>
+                <th>actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredTransactions.map((row) => (
-                <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>{row.date}</td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
+                <tr key={row.id}>
+                  <td>{row.date}</td>
+                  <td>
                     {row.type === "transfer"
                       ? `${row.fromAccountName} → ${row.toAccountName}`
                       : row.type === "opening-balance"
                         ? "opening balance"
                         : row.merchant ?? "—"}
                   </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
+                  <td>
                     {row.type === "transfer"
                       ? "transfer"
                       : row.type === "opening-balance"
                         ? "—"
                         : categoryMap.get(row.categoryId) ?? "unknown"}
                   </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
-                    {row.type === "transfer" ? "—" : row.accountName}
+                  <td>{row.type === "transfer" ? "—" : row.accountName}</td>
+                  <td>
+                    <div className="badge-row">
+                      <span
+                        className={
+                          row.type === "transfer"
+                            ? "badge badge--transfer"
+                            : row.type === "opening-balance"
+                              ? "badge badge--opening"
+                              : row.amountCents >= 0
+                                ? "badge badge--income"
+                                : "badge badge--expense"
+                        }
+                      >
+                        {row.type === "transfer"
+                          ? "transfer"
+                          : row.type === "opening-balance"
+                            ? "opening balance"
+                            : row.amountCents >= 0
+                              ? "income"
+                              : "expense"}
+                      </span>
+                      <span
+                        className={
+                          row.source === "recurring"
+                            ? "badge badge--recurring"
+                            : "badge badge--neutral"
+                        }
+                      >
+                        {row.source}
+                      </span>
+                    </div>
                   </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>{row.source}</td>
                   <td
                     style={{
-                      padding: "0.65rem 0.5rem",
                       color:
                         row.type === "transfer"
                           ? "#1d4ed8"
@@ -440,35 +381,21 @@ export function TransactionsPage() {
                         : row.amountCents
                     )}
                   </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
-                    {row.note ?? "—"}
-                  </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
+                  <td>{row.note ?? "—"}</td>
+                  <td>
                     {row.type === "opening-balance" ? (
-                      <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>
-                        edit in settings
+                      <span className="badge badge--muted">
+                        edit in accounts
                       </span>
                     ) : (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "0.5rem",
-                          flexWrap: "wrap",
-                        }}
-                      >
+                      <div className="table-actions">
                         <button
                           type="button"
                           onClick={() => {
                             setEditingId(row.id);
                             setShowCreateForm(false);
                           }}
-                          style={{
-                            padding: "0.45rem 0.65rem",
-                            borderRadius: "0.45rem",
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
-                            cursor: "pointer",
-                          }}
+                          style={compactSecondaryButtonStyle}
                         >
                           edit
                         </button>
@@ -476,14 +403,7 @@ export function TransactionsPage() {
                         <button
                           type="button"
                           onClick={() => handleDelete(row)}
-                          style={{
-                            padding: "0.45rem 0.65rem",
-                            borderRadius: "0.45rem",
-                            border: "1px solid #fecaca",
-                            background: "#fef2f2",
-                            color: "#991b1b",
-                            cursor: "pointer",
-                          }}
+                          style={compactDangerButtonStyle}
                         >
                           delete
                         </button>
@@ -497,14 +417,13 @@ export function TransactionsPage() {
                 <tr>
                   <td
                     colSpan={8}
-                    style={{
-                      padding: "1rem 0.5rem",
-                      color: "#6b7280",
-                    }}
+                    style={{ padding: 0 }}
                   >
-                    {hasActiveFilters
-                      ? "no transactions match the current filters for this month. try clearing filters."
-                      : "no transactions for this month yet. suspiciously peaceful."}
+                    <p className="empty-state">
+                      {hasActiveFilters
+                        ? "no transactions match the current filters for this month. try clearing filters."
+                        : "no transactions for this month yet. suspiciously peaceful."}
+                    </p>
                   </td>
                 </tr>
               ) : null}

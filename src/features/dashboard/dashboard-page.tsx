@@ -3,39 +3,24 @@ import { useMemo, useState } from "react";
 import { useAppStore } from "../../app/store";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents, getBudgetRows, getMonthlySummary } from "../../lib/money";
+import { inputStyle, primaryButtonStyle } from "../components/style-constants";
 
 function Card(props: {
   title: string;
   value: string;
   tone?: "default" | "good" | "bad";
 }) {
-  const color =
+  const toneClass =
     props.tone === "good"
-      ? "#166534"
+      ? "summary-card summary-card--good"
       : props.tone === "bad"
-        ? "#991b1b"
-        : "#111827";
+        ? "summary-card summary-card--bad"
+        : "summary-card";
 
   return (
-    <div
-      style={{
-        background: "#ffffff",
-        border: "1px solid #e5e7eb",
-        borderRadius: "0.75rem",
-        padding: "1rem",
-      }}
-    >
-      <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>{props.title}</div>
-      <div
-        style={{
-          marginTop: "0.4rem",
-          fontSize: "1.5rem",
-          fontWeight: 700,
-          color,
-        }}
-      >
-        {props.value}
-      </div>
+    <div className={toneClass}>
+      <div className="summary-card__label">{props.title}</div>
+      <div className="summary-card__value">{props.value}</div>
     </div>
   );
 }
@@ -64,70 +49,37 @@ export function DashboardPage() {
   const recentTransactions = transactions.slice(0, 8);
 
   return (
-    <section style={{ display: "grid", gap: "1.25rem" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-          alignItems: "end",
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>dashboard</h1>
-          <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
+    <section className="page">
+      <div className="page-header">
+        <div className="page-title-group">
+          <h1 className="page-title">dashboard</h1>
+          <p className="page-subtitle">
             month snapshot. no oracle, just arithmetic.
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <label
-            style={{
-              display: "grid",
-              gap: "0.35rem",
-              fontSize: "0.9rem",
-              color: "#374151",
-            }}
-          >
-            month
+        <div className="page-actions">
+          <label className="field">
+            <span className="field__label">month</span>
             <input
               type="month"
               value={month}
               onChange={(event) => setMonth(event.target.value)}
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              style={inputStyle}
             />
           </label>
 
           <button
             type="button"
             onClick={() => generateRecurringForMonth(month)}
-            style={{
-              padding: "0.7rem 0.95rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #d1d5db",
-              background: "#111827",
-              color: "#ffffff",
-              cursor: "pointer",
-            }}
+            style={primaryButtonStyle}
           >
             generate recurring
           </button>
         </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gap: "1rem",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        }}
-      >
+      <div className="summary-grid">
         <Card title="income" value={formatCents(summary.incomeCents)} />
         <Card title="expenses" value={formatCents(summary.expenseCents)} />
         <Card
@@ -142,25 +94,12 @@ export function DashboardPage() {
         />
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gap: "1rem",
-          gridTemplateColumns: "1fr 1fr",
-        }}
-      >
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.75rem",
-            padding: "1rem",
-          }}
-        >
-          <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>over budget</h2>
+      <div className="summary-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+        <div className="section-card">
+          <h2 className="section-title">over budget</h2>
 
           {overBudget.length === 0 ? (
-            <p style={{ color: "#166534", marginBottom: 0 }}>
+            <p className="empty-state" style={{ color: "#166534" }}>
               shocking restraint. nothing over budget this month.
             </p>
           ) : (
@@ -175,81 +114,107 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.75rem",
-            padding: "1rem",
-          }}
-        >
-          <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>
-            category snapshot
-          </h2>
+        <div className="section-card">
+          <h2 className="section-title">category snapshot</h2>
 
-          <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-            {budgetRows.slice(0, 5).map((row) => (
-              <li key={row.categoryId} style={{ marginBottom: "0.4rem" }}>
-                {row.categoryName}: {formatCents(row.actualCents)} spent /{" "}
-                {formatCents(row.plannedCents)} planned
-              </li>
-            ))}
-          </ul>
+          {budgetRows.length === 0 ? (
+            <p className="empty-state">no budget rows for this month yet.</p>
+          ) : (
+            <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
+              {budgetRows.slice(0, 5).map((row) => (
+                <li key={row.categoryId} style={{ marginBottom: "0.4rem" }}>
+                  {row.categoryName}: {formatCents(row.actualCents)} spent /{" "}
+                  {formatCents(row.plannedCents)} planned
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 
-      <div
-        style={{
-          background: "#ffffff",
-          border: "1px solid #e5e7eb",
-          borderRadius: "0.75rem",
-          padding: "1rem",
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>recent transactions</h2>
+      <div className="section-card">
+        <div className="section-header">
+          <div className="section-title-group">
+            <h2 className="section-title">recent transactions</h2>
+            <p className="section-subtitle">latest ledger activity across all accounts.</p>
+          </div>
+        </div>
 
-        <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-            }}
-          >
+        <div className="table-wrap">
+          <table className="app-table">
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-                <th style={{ padding: "0.65rem 0.5rem" }}>date</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>merchant</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>source</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>amount</th>
+              <tr>
+                <th>date</th>
+                <th>details</th>
+                <th>badges</th>
+                <th>amount</th>
               </tr>
             </thead>
             <tbody>
-              {recentTransactions.map((transaction) => (
-                <tr
-                  key={transaction.id}
-                  style={{ borderBottom: "1px solid #f3f4f6" }}
-                >
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
-                    {transaction.date}
-                  </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
-                    {transaction.merchant ?? "—"}
-                  </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
-                    {transaction.source}
-                  </td>
-                  <td
-                    style={{
-                      padding: "0.65rem 0.5rem",
-                      color:
-                        transaction.amountCents >= 0 ? "#166534" : "#991b1b",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {formatCents(transaction.amountCents)}
+              {recentTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan={4}>
+                    <p className="empty-state">no transactions yet.</p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                recentTransactions.map((transaction) => (
+                  <tr key={transaction.id}>
+                    <td>{transaction.date}</td>
+                    <td>
+                      {transaction.kind === "opening-balance"
+                        ? "opening balance"
+                        : transaction.kind === "transfer"
+                          ? "transfer"
+                          : transaction.merchant ?? "—"}
+                    </td>
+                    <td>
+                      <div className="badge-row">
+                        <span
+                          className={
+                            transaction.kind === "transfer"
+                              ? "badge badge--transfer"
+                              : transaction.kind === "opening-balance"
+                                ? "badge badge--opening"
+                                : transaction.amountCents >= 0
+                                  ? "badge badge--income"
+                                  : "badge badge--expense"
+                          }
+                        >
+                          {transaction.kind === "transfer"
+                            ? "transfer"
+                            : transaction.kind === "opening-balance"
+                              ? "opening balance"
+                              : transaction.amountCents >= 0
+                                ? "income"
+                                : "expense"}
+                        </span>
+                        <span
+                          className={
+                            transaction.source === "recurring"
+                              ? "badge badge--recurring"
+                              : "badge badge--neutral"
+                          }
+                        >
+                          {transaction.source}
+                        </span>
+                      </div>
+                    </td>
+                    <td
+                      className={
+                        transaction.kind === "transfer"
+                          ? "text-info"
+                          : transaction.amountCents >= 0
+                            ? "text-positive"
+                            : "text-negative"
+                      }
+                      style={{ fontWeight: 700 }}
+                    >
+                      {formatCents(transaction.amountCents)}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
