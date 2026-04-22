@@ -188,233 +188,106 @@ export function BudgetPage() {
   }
 
   return (
-    <section style={{ display: "grid", gap: "1.25rem" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-          alignItems: "end",
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>budget</h1>
-          <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
-            planned vs actual. now with agency.
-          </p>
+    <section className="page">
+      <div className="page-header">
+        <div className="page-header-copy">
+          <h1 className="page-title">budgets</h1>
+          <p className="page-subtitle">planned vs actual. now with agency.</p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <label
-            style={{
-              display: "grid",
-              gap: "0.35rem",
-              fontSize: "0.9rem",
-              color: "#374151",
-            }}
-          >
-            month
+        <div className="page-actions">
+          <label className="field">
+            <span className="field-label">month</span>
             <input
               type="month"
               value={month}
               onChange={(event) => setMonth(event.target.value)}
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              className="control control--compact"
             />
           </label>
 
-          <button
-            type="button"
-            onClick={saveAllBudgets}
-            style={{
-              padding: "0.7rem 0.95rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #d1d5db",
-              background: "#111827",
-              color: "#ffffff",
-              cursor: "pointer",
-            }}
-          >
+          <button type="button" onClick={saveAllBudgets} className="button button--primary">
             save all budgets
           </button>
         </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gap: "1rem",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        }}
-      >
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.75rem",
-            padding: "1rem",
-          }}
-        >
-          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>planned</div>
-          <div
-            style={{
-              marginTop: "0.4rem",
-              fontSize: "1.4rem",
-              fontWeight: 700,
-            }}
-          >
-            {formatCents(draftSummary.plannedCents)}
-          </div>
+      <div className="summary-grid">
+        <div className="summary-item">
+          <div className="summary-label">planned</div>
+          <div className="summary-value">{formatCents(draftSummary.plannedCents)}</div>
         </div>
 
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.75rem",
-            padding: "1rem",
-          }}
-        >
-          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>spent</div>
-          <div
-            style={{
-              marginTop: "0.4rem",
-              fontSize: "1.4rem",
-              fontWeight: 700,
-            }}
-          >
-            {formatCents(summary.expenseCents)}
-          </div>
+        <div className="summary-item">
+          <div className="summary-label">spent</div>
+          <div className="summary-value">{formatCents(summary.expenseCents)}</div>
         </div>
 
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.75rem",
-            padding: "1rem",
-          }}
-        >
-          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>unassigned</div>
-          <div
-            style={{
-              marginTop: "0.4rem",
-              fontSize: "1.4rem",
-              fontWeight: 700,
-              color: draftSummary.unassignedCents < 0 ? "#991b1b" : "#111827",
-            }}
-          >
+        <div className="summary-item">
+          <div className="summary-label">unassigned</div>
+          <div className={`summary-value ${draftSummary.unassignedCents < 0 ? "text-negative" : ""}`}>
             {formatCents(draftSummary.unassignedCents)}
           </div>
         </div>
       </div>
 
-      <div
-        style={{
-          background: "#ffffff",
-          border: "1px solid #e5e7eb",
-          borderRadius: "0.75rem",
-          padding: "1rem",
-        }}
-      >
-        <div style={{ overflowX: "auto" }}>
-          <div
-            style={{
-              display: "grid",
-              gap: "0.75rem",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              marginBottom: "1rem",
-              alignItems: "end",
-            }}
-          >
-            <label style={{ display: "grid", gap: "0.35rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "#374151" }}>add category</span>
-              <select
-                value={newCategoryId}
-                onChange={(event) => setNewCategoryId(event.target.value)}
-                disabled={availableCategories.length === 0}
-                style={{
-                  padding: "0.55rem 0.7rem",
-                  borderRadius: "0.5rem",
-                  border: "1px solid #d1d5db",
-                  background: "#ffffff",
-                }}
-              >
-                {availableCategories.length === 0 ? (
-                  <option value="">all expense categories already budgeted</option>
-                ) : null}
+      <div className="section">
+        <div className="toolbar">
+          <label className="field">
+            <span className="field-label">add category</span>
+            <select
+              value={newCategoryId}
+              onChange={(event) => setNewCategoryId(event.target.value)}
+              disabled={availableCategories.length === 0}
+              className="control"
+            >
+              {availableCategories.length === 0 ? (
+                <option value="">all expense categories already budgeted</option>
+              ) : null}
 
-                {availableCategories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              {availableCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-            <label style={{ display: "grid", gap: "0.35rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "#374151" }}>planned</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={newPlannedAmount}
-                onChange={(event) => setNewPlannedAmount(event.target.value)}
-                style={{
-                  padding: "0.55rem 0.7rem",
-                  borderRadius: "0.5rem",
-                  border: "1px solid #d1d5db",
-                  background: "#ffffff",
-                }}
-              />
-            </label>
+          <label className="field">
+            <span className="field-label">planned</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={newPlannedAmount}
+              onChange={(event) => setNewPlannedAmount(event.target.value)}
+              className="control"
+            />
+          </label>
 
+          <div className="toolbar-actions">
             <button
               type="button"
               onClick={handleAddBudget}
               disabled={availableCategories.length === 0}
-              style={{
-                padding: "0.7rem 0.95rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: availableCategories.length === 0 ? "#f3f4f6" : "#111827",
-                color: availableCategories.length === 0 ? "#9ca3af" : "#ffffff",
-                cursor: availableCategories.length === 0 ? "not-allowed" : "pointer",
-              }}
+              className="button button--primary"
             >
               add budget
             </button>
           </div>
+        </div>
 
-          {addError ? (
-            <p style={{ margin: "0 0 1rem", color: "#b91c1c", fontSize: "0.9rem" }}>
-              {addError}
-            </p>
-          ) : null}
+        {addError ? <p className="status-message status-message--error">{addError}</p> : null}
 
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-            }}
-          >
+        <div className="table-wrapper">
+          <table className="table">
             <thead>
-              <tr
-                style={{
-                  textAlign: "left",
-                  borderBottom: "1px solid #e5e7eb",
-                }}
-              >
-                <th style={{ padding: "0.65rem 0.5rem" }}>category</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>planned</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>actual</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>remaining</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>actions</th>
+              <tr>
+                <th>category</th>
+                <th>planned</th>
+                <th>actual</th>
+                <th>remaining</th>
+                <th className="cell-actions">actions</th>
               </tr>
             </thead>
             <tbody>
@@ -427,63 +300,29 @@ export function BudgetPage() {
                 const overBudget = remainingCents < 0;
 
                 return (
-                  <tr
-                    key={row.budgetId}
-                    style={{ borderBottom: "1px solid #f3f4f6" }}
-                  >
-                    <td style={{ padding: "0.65rem 0.5rem" }}>
-                      {row.categoryName}
-                    </td>
-
-                    <td style={{ padding: "0.65rem 0.5rem" }}>
+                  <tr key={row.budgetId}>
+                    <td>{row.categoryName}</td>
+                    <td>
                       <input
                         type="text"
                         inputMode="decimal"
                         placeholder="0.00"
                         value={drafts[row.categoryId] ?? ""}
-                        onChange={(event) =>
-                          updateDraft(row.categoryId, event.target.value)
-                        }
-                        style={{
-                          width: "120px",
-                          padding: "0.5rem 0.6rem",
-                          borderRadius: "0.45rem",
-                          border: dirty
-                            ? "1px solid #2563eb"
-                            : "1px solid #d1d5db",
-                          background: "#ffffff",
-                        }}
+                        onChange={(event) => updateDraft(row.categoryId, event.target.value)}
+                        className={`control control--compact${dirty ? " control--dirty" : ""}`}
                       />
                     </td>
-
-                    <td style={{ padding: "0.65rem 0.5rem" }}>
-                      {formatCents(row.actualCents)}
-                    </td>
-
-                    <td
-                      style={{
-                        padding: "0.65rem 0.5rem",
-                        color: overBudget ? "#991b1b" : "#166534",
-                        fontWeight: 600,
-                      }}
-                    >
+                    <td>{formatCents(row.actualCents)}</td>
+                    <td className={`cell-amount ${overBudget ? "text-negative" : "text-positive"}`}>
                       {formatCents(remainingCents)}
                     </td>
-
-                    <td style={{ padding: "0.65rem 0.5rem" }}>
-                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <td className="cell-actions">
+                      <div className="action-group">
                         <button
                           type="button"
                           onClick={() => saveCategoryBudget(row.categoryId)}
                           disabled={!dirty}
-                          style={{
-                            padding: "0.45rem 0.65rem",
-                            borderRadius: "0.45rem",
-                            border: "1px solid #d1d5db",
-                            background: dirty ? "#111827" : "#f3f4f6",
-                            color: dirty ? "#ffffff" : "#9ca3af",
-                            cursor: dirty ? "pointer" : "not-allowed",
-                          }}
+                          className="button button--primary button--small"
                         >
                           save
                         </button>
@@ -491,14 +330,7 @@ export function BudgetPage() {
                         <button
                           type="button"
                           onClick={() => removeCategoryBudget(row.categoryId)}
-                          style={{
-                            padding: "0.45rem 0.65rem",
-                            borderRadius: "0.45rem",
-                            border: "1px solid #ef4444",
-                            background: "#ffffff",
-                            color: "#b91c1c",
-                            cursor: "pointer",
-                          }}
+                          className="button button--danger button--small"
                         >
                           remove
                         </button>
@@ -510,10 +342,7 @@ export function BudgetPage() {
 
               {rows.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={5}
-                    style={{ padding: "1rem 0.5rem", color: "#6b7280" }}
-                  >
+                  <td colSpan={5} className="text-muted">
                     no budgets for this month yet. add one to get started.
                   </td>
                 </tr>

@@ -1,4 +1,5 @@
 import type { SubmitEvent } from "react";
+
 import { parseAmountInputToCents } from "../../../lib/money";
 import type {
   Account,
@@ -7,13 +8,6 @@ import type {
   RecurringRuleKind,
 } from "../../../types";
 import type { RecurringRuleFormValues } from "../../types";
-import { inputStyle, primaryButtonStyle, secondaryButtonStyle } from "../style-constants";
-
-const fieldLabelStyle = {
-  display: "grid",
-  gap: "0.35rem",
-  minWidth: 0,
-} as const;
 
 type RecurringRuleEditorProps = {
   values: RecurringRuleFormValues;
@@ -62,56 +56,48 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
       transferAmountCents <= 0);
 
   return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: "0.75rem" }}>
-      <div
-        style={{
-          display: "grid",
-          gap: "0.75rem",
-          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-        }}
-      >
-        <label style={fieldLabelStyle}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>rule type</span>
+    <form onSubmit={onSubmit} className="stack-md">
+      <div className="form-grid form-grid--tight">
+        <label className="field">
+          <span className="field-label">rule type</span>
           <select
             value={values.kind}
             onChange={(event) => onKindChange(event.target.value as RecurringRuleKind)}
-            style={inputStyle}
+            className="control"
           >
             <option value="standard">standard</option>
             <option value="transfer">transfer</option>
           </select>
         </label>
 
-        <label style={fieldLabelStyle}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>name</span>
+        <label className="field">
+          <span className="field-label">name</span>
           <input
             type="text"
             value={values.name}
             onChange={(event) => onChange("name", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
-        <label style={fieldLabelStyle}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>amount</span>
+        <label className="field">
+          <span className="field-label">amount</span>
           <input
             type="text"
             inputMode="decimal"
             placeholder="0.00"
             value={values.amount}
             onChange={(event) => onChange("amount", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
-        <label style={fieldLabelStyle}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-            {isTransferRule ? "from account" : "account"}
-          </span>
+        <label className="field">
+          <span className="field-label">{isTransferRule ? "from account" : "account"}</span>
           <select
             value={values.accountId}
             onChange={(event) => onChange("accountId", event.target.value)}
-            style={inputStyle}
+            className="control"
           >
             <option value="">select account</option>
             {accounts.map((account) => (
@@ -123,12 +109,12 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
         </label>
 
         {isTransferRule ? (
-          <label style={fieldLabelStyle}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>to account</span>
+          <label className="field">
+            <span className="field-label">to account</span>
             <select
               value={values.toAccountId}
               onChange={(event) => onChange("toAccountId", event.target.value)}
-              style={inputStyle}
+              className="control"
             >
               <option value="">select account</option>
               {accounts.map((account) => (
@@ -139,12 +125,12 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             </select>
           </label>
         ) : (
-          <label style={fieldLabelStyle}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>category</span>
+          <label className="field">
+            <span className="field-label">category</span>
             <select
               value={values.categoryId}
               onChange={(event) => onChange("categoryId", event.target.value)}
-              style={inputStyle}
+              className="control"
             >
               <option value="">select category</option>
               {categories.map((category) => (
@@ -156,16 +142,12 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
           </label>
         )}
 
-        <label style={fieldLabelStyle}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-            frequency
-          </span>
+        <label className="field">
+          <span className="field-label">frequency</span>
           <select
             value={values.frequency}
-            onChange={(event) =>
-              onFrequencyChange(event.target.value as RecurringFrequency)
-            }
-            style={inputStyle}
+            onChange={(event) => onFrequencyChange(event.target.value as RecurringFrequency)}
+            className="control"
           >
             <option value="monthly">monthly</option>
             <option value="weekly">weekly</option>
@@ -174,51 +156,45 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
           </select>
         </label>
 
-        <label style={fieldLabelStyle}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-            start date
-          </span>
+        <label className="field">
+          <span className="field-label">start date</span>
           <input
             type="date"
             value={values.startDate}
             onChange={(event) => onStartDateChange(event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
-        <label style={fieldLabelStyle}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>end date</span>
+        <label className="field">
+          <span className="field-label">end date</span>
           <input
             type="date"
             value={values.endDate}
             onChange={(event) => onChange("endDate", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
         {values.frequency === "monthly" ? (
-          <label style={fieldLabelStyle}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              day of month
-            </span>
+          <label className="field">
+            <span className="field-label">day of month</span>
             <input
               type="number"
               min="1"
               max="31"
               value={values.dayOfMonth}
               onChange={(event) => onChange("dayOfMonth", event.target.value)}
-              style={inputStyle}
+              className="control"
             />
           </label>
         ) : values.frequency === "weekly" || values.frequency === "biweekly" ? (
-          <label style={fieldLabelStyle}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              day of week
-            </span>
+          <label className="field">
+            <span className="field-label">day of week</span>
             <select
               value={values.dayOfWeek}
               onChange={(event) => onChange("dayOfWeek", event.target.value)}
-              style={inputStyle}
+              className="control"
             >
               <option value="0">sun</option>
               <option value="1">mon</option>
@@ -232,79 +208,60 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
         ) : null}
 
         {!isTransferRule ? (
-          <label style={fieldLabelStyle}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>merchant</span>
+          <label className="field">
+            <span className="field-label">merchant</span>
             <input
               type="text"
               value={values.merchant}
               onChange={(event) => onChange("merchant", event.target.value)}
-              style={inputStyle}
+              className="control"
             />
           </label>
         ) : null}
 
-        <label style={fieldLabelStyle}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>note</span>
+        <label className="field">
+          <span className="field-label">note</span>
           <input
             type="text"
             value={values.note}
             onChange={(event) => onChange("note", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
       </div>
 
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          color: "#374151",
-          fontSize: "0.9rem",
-        }}
-      >
+      <label className="field inline-toggle">
         <input
           type="checkbox"
           checked={values.active}
           onChange={(event) => onChange("active", event.target.checked)}
         />
-        active rule
+        <span className="field-label">active rule</span>
       </label>
 
       {isTransferRule ? (
-        <p style={{ margin: 0, color: "#6b7280", fontSize: "0.9rem" }}>
+        <p className="field-help">
           transfer amounts are stored as positive values and generated as linked transfer pairs.
         </p>
       ) : (
-        <p style={{ margin: 0, color: "#6b7280", fontSize: "0.9rem" }}>
+        <p className="field-help">
           selected category kind: {selectedCategory?.kind ?? "n/a"}. saved amount will be {selectedCategory?.kind === "income" ? "positive" : "negative"}.
         </p>
       )}
 
-      {error ? (
-        <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem" }}>
-          {error}
-        </p>
-      ) : null}
+      {error ? <p className="status-message status-message--error">{error}</p> : null}
 
-      <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+      <div className="form-actions">
         <button
           type="submit"
           disabled={submitDisabled || transferSubmitInvalid}
-          style={{
-            ...primaryButtonStyle,
-            opacity: submitDisabled || transferSubmitInvalid ? 0.6 : 1,
-            cursor:
-              submitDisabled || transferSubmitInvalid
-                ? "not-allowed"
-                : "pointer",
-          }}
+          className="button button--primary"
         >
           {submitLabel}
         </button>
 
         {onCancel ? (
-          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
+          <button type="button" onClick={onCancel} className="button button--secondary">
             cancel
           </button>
         ) : null}

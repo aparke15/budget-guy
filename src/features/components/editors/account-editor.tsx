@@ -1,7 +1,7 @@
 import type { SubmitEvent } from "react";
-import type { AccountFormValues } from "../../types";
-import { inputStyle, primaryButtonStyle, secondaryButtonStyle } from "../style-constants";
+
 import type { AccountType } from "../../../types";
+import type { AccountFormValues } from "../../types";
 
 type AccountEditorProps = {
   values: AccountFormValues;
@@ -19,32 +19,24 @@ export function AccountEditor(props: AccountEditorProps) {
   const { values, error, submitLabel, onSubmit, onChange, onCancel } = props;
 
   return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: "0.75rem" }}>
-      <div
-        style={{
-          display: "grid",
-          gap: "0.75rem",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        }}
-      >
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>name</span>
+    <form onSubmit={onSubmit} className="stack-md">
+      <div className="form-grid">
+        <label className="field">
+          <span className="field-label">name</span>
           <input
             type="text"
             value={values.name}
             onChange={(event) => onChange("name", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>type</span>
+        <label className="field">
+          <span className="field-label">type</span>
           <select
             value={values.type}
-            onChange={(event) =>
-              onChange("type", event.target.value as AccountType)
-            }
-            style={inputStyle}
+            onChange={(event) => onChange("type", event.target.value as AccountType)}
+            className="control"
           >
             <option value="checking">checking</option>
             <option value="savings">savings</option>
@@ -54,61 +46,51 @@ export function AccountEditor(props: AccountEditorProps) {
         </label>
 
         {values.type === "credit" ? (
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              credit limit
-            </span>
+          <label className="field">
+            <span className="field-label">credit limit</span>
             <input
               type="text"
               inputMode="decimal"
               placeholder="0.00"
               value={values.creditLimit}
               onChange={(event) => onChange("creditLimit", event.target.value)}
-              style={inputStyle}
+              className="control"
             />
           </label>
         ) : null}
 
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-            opening balance
-          </span>
+        <label className="field">
+          <span className="field-label">opening balance</span>
           <input
             type="text"
             inputMode="decimal"
             placeholder="0.00"
             value={values.openingBalance}
             onChange={(event) => onChange("openingBalance", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-            opening balance date
-          </span>
+        <label className="field">
+          <span className="field-label">opening balance date</span>
           <input
             type="date"
             value={values.openingBalanceDate}
             onChange={(event) => onChange("openingBalanceDate", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
       </div>
 
-      {error ? (
-        <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem" }}>
-          {error}
-        </p>
-      ) : null}
+      {error ? <p className="status-message status-message--error">{error}</p> : null}
 
-      <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-        <button type="submit" style={primaryButtonStyle}>
+      <div className="form-actions">
+        <button type="submit" className="button button--primary">
           {submitLabel}
         </button>
 
         {onCancel ? (
-          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
+          <button type="button" onClick={onCancel} className="button button--secondary">
             cancel
           </button>
         ) : null}

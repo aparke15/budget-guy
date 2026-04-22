@@ -10,12 +10,16 @@ import {
 } from "../../lib/account-balances";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents } from "../../lib/money";
-import { cardStyle, secondaryButtonStyle } from "../components/style-constants";
-
-const tableCellStyle = {
-  padding: "0.7rem 0.55rem",
-  borderBottom: "1px solid #f3f4f6",
-} as const;
+import { DeleteImpactBanner } from "../components/delete-impact-banner";
+import {
+  buildDeleteImpact,
+  countById,
+  countRecurringRulesByAccountId,
+  sortItemsByName,
+  type DeleteImpact,
+  type PendingDelete,
+} from "../shared/management-helpers";
+import { AccountManagementSection } from "./account-management-section";
 
 const historyRanges: Array<{ value: AccountHistoryRange; label: string }> = [
   { value: "6", label: "last 6 months" },
@@ -25,34 +29,59 @@ const historyRanges: Array<{ value: AccountHistoryRange; label: string }> = [
 
 export function AccountsPage() {
   const accounts = useAppStore((state) => state.accounts);
+  const budgets = useAppStore((state) => state.budgets);
   const transactions = useAppStore((state) => state.transactions);
+  const recurringRules = useAppStore((state) => state.recurringRules);
+  const addAccount = useAppStore((state) => state.addAccount);
+  const updateAccount = useAppStore((state) => state.updateAccount);
+  const deleteAccount = useAppStore((state) => state.deleteAccount);
+  const upsertAccountOpeningBalance = useAppStore(
+    (state) => state.upsertAccountOpeningBalance
+  );
+  const deleteAccountOpeningBalance = useAppStore(
+    (state) => state.deleteAccountOpeningBalance
+  );
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [historyRange, setHistoryRange] = useState<AccountHistoryRange>("6");
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+
+  const sortedAccounts = useMemo(() => sortItemsByName(accounts), [accounts]);
+  const accountTransactionCounts = useMemo(
+    () => countById(transactions, (transaction) => transaction.accountId),
+    [transactions]
+  );
+  const accountRecurringRuleCounts = useMemo(
+    () => countRecurringRulesByAccountId(recurringRules),
+    [recurringRules]
+  );
+  const deleteImpact = useMemo<DeleteImpact | null>(() => {
+    return buildDeleteImpact(pendingDelete, budgets, transactions, recurringRules);
+  }, [budgets, pendingDelete, recurringRules, transactions]);
 
   const balanceRows = useMemo(
-    () => getAllAccountBalances(accounts, transactions),
-    [accounts, transactions]
+    () => getAllAccountBalances(sortedAccounts, transactions),
+    [sortedAccounts, transactions]
   );
 
   useEffect(() => {
-    if (accounts.length === 0) {
+    if (sortedAccounts.length === 0) {
       setSelectedAccountId(null);
       return;
     }
 
     if (
       selectedAccountId &&
-      accounts.some((account) => account.id === selectedAccountId)
+      sortedAccounts.some((account) => account.id === selectedAccountId)
     ) {
       return;
     }
 
-    setSelectedAccountId(accounts[0]?.id ?? null);
-  }, [accounts, selectedAccountId]);
+    setSelectedAccountId(sortedAccounts[0]?.id ?? null);
+  }, [selectedAccountId, sortedAccounts]);
 
   const selectedAccount = useMemo(
-    () => accounts.find((account) => account.id === selectedAccountId),
-    [accounts, selectedAccountId]
+    () => sortedAccounts.find((account) => account.id === selectedAccountId),
+    [selectedAccountId, sortedAccounts]
   );
 
   const historyRows = useMemo(
@@ -68,119 +97,123 @@ export function AccountsPage() {
     [historyRange, selectedAccountId, transactions]
   );
 
-  if (accounts.length === 0) {
-    return (
-      <section style={{ display: "grid", gap: "1.25rem" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>accounts</h1>
-          <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
-            balances from transactions only. no mysticism, no budgets.
-          </p>
-        </div>
+  function handleConfirmDelete() {
+    if (!pendingDelete || pendingDelete.entity !== "account") {
+      return;
+    }
 
-        <div style={cardStyle}>
-          <p style={{ margin: 0, color: "#6b7280" }}>
-            no accounts yet. add one in settings to see balances and history.
-          </p>
-        </div>
-      </section>
-    );
+    deleteAccount(pendingDelete.id);
+    setPendingDelete(null);
   }
 
   return (
-    <section style={{ display: "grid", gap: "1.25rem" }}>
-      <div>
-        <h1 style={{ margin: 0, fontSize: "1.8rem" }}>accounts</h1>
-        <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
-          balances from transactions only. transfers included, budgets ignored.
+    <section className="page">
+      <div className="page-header-copy">
+        <h1 className="page-title">accounts</h1>
+        <p className="page-subtitle">
+          account setup, balances, and history all live here now.
         </p>
       </div>
 
-      <div style={cardStyle}>
-        <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>current balances</h2>
+      {deleteImpact ? (
+        <DeleteImpactBanner
+          deleteImpact={deleteImpact}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      ) : null}
 
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-                <th style={tableCellStyle}>account name</th>
-                <th style={tableCellStyle}>account type</th>
-                <th style={tableCellStyle}>current view</th>
-                <th style={tableCellStyle}>limit</th>
-                <th style={tableCellStyle}>available credit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {balanceRows.map((row) => {
-                const isSelected = row.accountId === selectedAccountId;
-                const isCredit = row.accountType === "credit";
-                const valueColor = isCredit
-                  ? row.displayValueCents > 0
-                    ? "#991b1b"
-                    : "#166534"
-                  : row.displayValueCents >= 0
-                    ? "#166534"
-                    : "#991b1b";
+      <AccountManagementSection
+        accounts={sortedAccounts}
+        transactions={transactions}
+        transactionCounts={accountTransactionCounts}
+        recurringRuleCounts={accountRecurringRuleCounts}
+        addAccount={addAccount}
+        updateAccount={updateAccount}
+        upsertAccountOpeningBalance={upsertAccountOpeningBalance}
+        deleteAccountOpeningBalance={deleteAccountOpeningBalance}
+        onRequestDelete={(account) =>
+          setPendingDelete({
+            entity: "account",
+            id: account.id,
+            name: account.name,
+          })
+        }
+      />
 
-                return (
-                  <tr
-                    key={row.accountId}
-                    onClick={() => setSelectedAccountId(row.accountId)}
-                    style={{
-                      cursor: "pointer",
-                      background: isSelected ? "#f3f4f6" : "transparent",
-                    }}
-                  >
-                    <td style={{ ...tableCellStyle, fontWeight: isSelected ? 600 : 500 }}>
-                      {row.accountName}
-                    </td>
-                    <td style={tableCellStyle}>{row.accountType}</td>
-                    <td
-                      style={{
-                        ...tableCellStyle,
-                        color: valueColor,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {row.displayLabel}: {formatCents(row.displayValueCents)}
-                    </td>
-                    <td style={tableCellStyle}>
-                      {row.creditLimitCents != null ? formatCents(row.creditLimitCents) : "—"}
-                    </td>
-                    <td style={tableCellStyle}>
-                      {row.availableCreditCents != null
-                        ? formatCents(row.availableCreditCents)
-                        : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <div className="section">
+        <div className="section-heading">
+          <h2 className="section-title">current balances</h2>
         </div>
+
+        {balanceRows.length === 0 ? (
+          <p className="empty-state">
+            add an account above to see balances and account history.
+          </p>
+        ) : (
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>account name</th>
+                  <th>account type</th>
+                  <th>current view</th>
+                  <th>limit</th>
+                  <th>available credit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {balanceRows.map((row) => {
+                  const isSelected = row.accountId === selectedAccountId;
+                  const isCredit = row.accountType === "credit";
+                  const valueClassName = isCredit
+                    ? row.displayValueCents > 0
+                      ? "text-negative"
+                      : "text-positive"
+                    : row.displayValueCents >= 0
+                      ? "text-positive"
+                      : "text-negative";
+
+                  return (
+                    <tr
+                      key={row.accountId}
+                      onClick={() => setSelectedAccountId(row.accountId)}
+                      className={`selection-table-row${isSelected ? " is-selected" : ""}`}
+                    >
+                      <td className={isSelected ? "cell-amount" : undefined}>{row.accountName}</td>
+                      <td>{row.accountType}</td>
+                      <td className={`cell-amount ${valueClassName}`}>
+                        {row.displayLabel}: {formatCents(row.displayValueCents)}
+                      </td>
+                      <td>
+                        {row.creditLimitCents != null ? formatCents(row.creditLimitCents) : "—"}
+                      </td>
+                      <td>
+                        {row.availableCreditCents != null
+                          ? formatCents(row.availableCreditCents)
+                          : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      <div style={cardStyle}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: "1rem",
-            alignItems: "end",
-            flexWrap: "wrap",
-            marginBottom: "1rem",
-          }}
-        >
-          <div>
-            <h2 style={{ margin: 0, fontSize: "1.1rem" }}>
+      <div className="section">
+        <div className="section-header">
+          <div className="section-heading">
+            <h2 className="section-title">
               {selectedAccount?.name ?? "selected account"} history
             </h2>
-            <p style={{ margin: "0.35rem 0 0", color: "#6b7280", fontSize: "0.9rem" }}>
+            <p className="section-subtitle">
               newest month first. closing {selectedAccount?.type === "credit" ? "owed" : "balance"} is cumulative through month end.
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: "0.55rem", flexWrap: "wrap" }}>
+          <div className="action-group">
             {historyRanges.map((option) => {
               const active = option.value === historyRange;
 
@@ -189,11 +222,7 @@ export function AccountsPage() {
                   key={option.value}
                   type="button"
                   onClick={() => setHistoryRange(option.value)}
-                  style={{
-                    ...secondaryButtonStyle,
-                    background: active ? "#e5e7eb" : secondaryButtonStyle.background,
-                    fontWeight: active ? 600 : 500,
-                  }}
+                  className={`button button--secondary${active ? " button--active" : ""}`}
                 >
                   {option.label}
                 </button>
@@ -202,20 +231,22 @@ export function AccountsPage() {
           </div>
         </div>
 
-        {historyRows.length === 0 ? (
-          <p style={{ margin: 0, color: "#6b7280" }}>
-            no transactions for this account yet.
+        {selectedAccount == null ? (
+          <p className="empty-state">
+            select an account after creating one to review monthly history.
           </p>
+        ) : historyRows.length === 0 ? (
+          <p className="empty-state">no transactions for this account yet.</p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="table-wrapper">
+            <table className="table">
               <thead>
-                <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-                  <th style={tableCellStyle}>month</th>
-                  <th style={tableCellStyle}>inflows</th>
-                  <th style={tableCellStyle}>outflows</th>
-                  <th style={tableCellStyle}>net change</th>
-                  <th style={tableCellStyle}>
+                <tr>
+                  <th>month</th>
+                  <th>inflows</th>
+                  <th>outflows</th>
+                  <th>net change</th>
+                  <th>
                     closing {selectedAccount?.type === "credit" ? "owed" : "balance"}
                   </th>
                 </tr>
@@ -231,40 +262,28 @@ export function AccountsPage() {
                   const closingLabel = selectedAccount
                     ? getDisplayedAccountBalanceLabel(selectedAccount)
                     : "balance";
-                  const closingColor =
+                  const closingClassName =
                     selectedAccount?.type === "credit"
                       ? closingValueCents > 0
-                        ? "#991b1b"
-                        : "#166534"
+                        ? "text-negative"
+                        : "text-positive"
                       : closingValueCents >= 0
-                        ? "#166534"
-                        : "#991b1b";
+                        ? "text-positive"
+                        : "text-negative";
 
                   return (
-                    <tr key={row.month} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                      <td style={tableCellStyle}>{row.month}</td>
-                      <td style={{ ...tableCellStyle, color: "#166534", fontWeight: 600 }}>
+                    <tr key={row.month}>
+                      <td>{row.month}</td>
+                      <td className="cell-amount text-positive">
                         {formatCents(row.inflowsCents)}
                       </td>
-                      <td style={{ ...tableCellStyle, color: "#991b1b", fontWeight: 600 }}>
+                      <td className="cell-amount text-negative">
                         {formatCents(row.outflowsCents)}
                       </td>
-                      <td
-                        style={{
-                          ...tableCellStyle,
-                          color: row.netChangeCents >= 0 ? "#166534" : "#991b1b",
-                          fontWeight: 600,
-                        }}
-                      >
+                      <td className={`cell-amount ${row.netChangeCents >= 0 ? "text-positive" : "text-negative"}`}>
                         {formatCents(row.netChangeCents)}
                       </td>
-                      <td
-                        style={{
-                          ...tableCellStyle,
-                          color: closingColor,
-                          fontWeight: 600,
-                        }}
-                      >
+                      <td className={`cell-amount ${closingClassName}`}>
                         {closingLabel}: {formatCents(closingValueCents)}
                       </td>
                     </tr>

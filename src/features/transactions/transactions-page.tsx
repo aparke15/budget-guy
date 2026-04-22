@@ -114,33 +114,16 @@ export function TransactionsPage() {
   }
 
   return (
-    <section style={{ display: "grid", gap: "1.25rem" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-          alignItems: "end",
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>transactions</h1>
-          <p style={{ margin: "0.4rem 0 0", color: "#6b7280" }}>
-            ledger first. glamour later.
-          </p>
+    <section className="page">
+      <div className="page-header">
+        <div className="page-header-copy">
+          <h1 className="page-title">transactions</h1>
+          <p className="page-subtitle">ledger first. glamour later.</p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <label
-            style={{
-              display: "grid",
-              gap: "0.35rem",
-              fontSize: "0.9rem",
-              color: "#374151",
-            }}
-          >
-            month
+        <div className="page-actions">
+          <label className="field">
+            <span className="field-label">month</span>
             <input
               type="month"
               value={filters.month}
@@ -150,12 +133,7 @@ export function TransactionsPage() {
                   month: event.target.value,
                 }))
               }
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              className="control control--compact"
             />
           </label>
 
@@ -165,14 +143,7 @@ export function TransactionsPage() {
               setShowCreateForm((current) => !current);
               setEditingId(null);
             }}
-            style={{
-              padding: "0.7rem 0.95rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #d1d5db",
-              background: "#111827",
-              color: "#ffffff",
-              cursor: "pointer",
-            }}
+            className="button button--primary"
           >
             {showCreateForm ? "hide form" : "add transaction"}
           </button>
@@ -180,17 +151,10 @@ export function TransactionsPage() {
       </div>
 
       {showCreateForm ? (
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.75rem",
-            padding: "1rem",
-          }}
-        >
-          <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>
-            new transaction
-          </h2>
+        <div className="section">
+          <div className="section-heading">
+            <h2 className="section-title">new transaction</h2>
+          </div>
 
           <TransactionForm
             accounts={accounts}
@@ -203,17 +167,10 @@ export function TransactionsPage() {
       ) : null}
 
       {editingTransaction ? (
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.75rem",
-            padding: "1rem",
-          }}
-        >
-          <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>
-            edit transaction
-          </h2>
+        <div className="section">
+          <div className="section-heading">
+            <h2 className="section-title">edit transaction</h2>
+          </div>
 
           <TransactionForm
             accounts={accounts}
@@ -243,32 +200,21 @@ export function TransactionsPage() {
         </div>
       ) : null}
 
-      <div
-        style={{
-          background: "#ffffff",
-          border: "1px solid #e5e7eb",
-          borderRadius: "0.75rem",
-          padding: "1rem",
-        }}
-      >
-        <div style={{ marginBottom: "0.9rem", color: "#6b7280" }}>
-          {filteredTransactions.length} transaction
-          {filteredTransactions.length === 1 ? "" : "s"} in {filters.month}
-          {hasActiveFilters ? " matching current filters" : ""}
+      <div className="section">
+        <div className="section-header">
+          <div className="section-heading">
+            <h2 className="section-title">ledger</h2>
+            <p className="section-subtitle">
+              {filteredTransactions.length} transaction
+              {filteredTransactions.length === 1 ? "" : "s"} in {filters.month}
+              {hasActiveFilters ? " matching current filters" : ""}
+            </p>
+          </div>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gap: "0.9rem",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            marginBottom: "1rem",
-          }}
-        >
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              account
-            </span>
+        <div className="filter-grid">
+          <label className="field">
+            <span className="field-label">account</span>
             <select
               value={filters.accountId ?? ""}
               onChange={(event) =>
@@ -277,12 +223,7 @@ export function TransactionsPage() {
                   accountId: event.target.value || null,
                 }))
               }
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              className="control"
             >
               <option value="">all accounts</option>
               {accounts.map((account) => (
@@ -293,10 +234,8 @@ export function TransactionsPage() {
             </select>
           </label>
 
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              category
-            </span>
+          <label className="field">
+            <span className="field-label">category</span>
             <select
               value={filters.categoryId ?? ""}
               onChange={(event) =>
@@ -305,12 +244,7 @@ export function TransactionsPage() {
                   categoryId: event.target.value || null,
                 }))
               }
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              className="control"
             >
               <option value="">all categories</option>
               {categories.map((category) => (
@@ -321,10 +255,8 @@ export function TransactionsPage() {
             </select>
           </label>
 
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-              search
-            </span>
+          <label className="field">
+            <span className="field-label">search</span>
             <input
               type="text"
               value={filters.search}
@@ -335,21 +267,11 @@ export function TransactionsPage() {
                 }))
               }
               placeholder="merchant or note"
-              style={{
-                padding: "0.55rem 0.7rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-              }}
+              className="control"
             />
           </label>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "end",
-            }}
-          >
+          <div className="toolbar-actions">
             <button
               type="button"
               onClick={() =>
@@ -361,114 +283,71 @@ export function TransactionsPage() {
                 }))
               }
               disabled={!hasActiveFilters}
-              style={{
-                padding: "0.7rem 0.95rem",
-                borderRadius: "0.5rem",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-                color: "#111827",
-                cursor: hasActiveFilters ? "pointer" : "not-allowed",
-                opacity: hasActiveFilters ? 1 : 0.6,
-              }}
+              className="button button--secondary"
             >
               clear filters
             </button>
           </div>
         </div>
 
-        <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-            }}
-          >
+        <div className="table-wrapper">
+          <table className="table">
             <thead>
-              <tr
-                style={{
-                  textAlign: "left",
-                  borderBottom: "1px solid #e5e7eb",
-                }}
-              >
-                <th style={{ padding: "0.65rem 0.5rem" }}>date</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>details</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>category</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>account</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>source</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>amount</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>note</th>
-                <th style={{ padding: "0.65rem 0.5rem" }}>actions</th>
+              <tr>
+                <th>date</th>
+                <th>details</th>
+                <th>category</th>
+                <th>account</th>
+                <th>source</th>
+                <th>amount</th>
+                <th>note</th>
+                <th className="cell-actions">actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredTransactions.map((row) => (
-                <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>{row.date}</td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
+                <tr key={row.id}>
+                  <td>{row.date}</td>
+                  <td>
                     {row.type === "transfer"
                       ? `${row.fromAccountName} → ${row.toAccountName}`
                       : row.type === "opening-balance"
                         ? "opening balance"
                         : row.merchant ?? "—"}
                   </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
+                  <td>
                     {row.type === "transfer"
                       ? "transfer"
                       : row.type === "opening-balance"
                         ? "—"
                         : categoryMap.get(row.categoryId) ?? "unknown"}
                   </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
-                    {row.type === "transfer" ? "—" : row.accountName}
-                  </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>{row.source}</td>
+                  <td>{row.type === "transfer" ? "—" : row.accountName}</td>
+                  <td>{row.source}</td>
                   <td
-                    style={{
-                      padding: "0.65rem 0.5rem",
-                      color:
-                        row.type === "transfer"
-                          ? "#1d4ed8"
-                          : row.amountCents >= 0
-                            ? "#166534"
-                            : "#991b1b",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {formatCents(
+                    className={`cell-amount ${
                       row.type === "transfer"
-                        ? row.amountCents
-                        : row.amountCents
-                    )}
+                        ? "text-info"
+                        : row.amountCents >= 0
+                          ? "text-positive"
+                          : "text-negative"
+                    }`}
+                  >
+                    {formatCents(row.amountCents)}
                   </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
-                    {row.note ?? "—"}
-                  </td>
-                  <td style={{ padding: "0.65rem 0.5rem" }}>
+                  <td>{row.note ?? "—"}</td>
+                  <td className="cell-actions">
                     {row.type === "opening-balance" ? (
-                      <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>
-                        edit in settings
-                      </span>
+                      <span className="inline-note">edit in settings</span>
                     ) : (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "0.5rem",
-                          flexWrap: "wrap",
-                        }}
-                      >
+                      <div className="action-group">
                         <button
                           type="button"
                           onClick={() => {
                             setEditingId(row.id);
                             setShowCreateForm(false);
                           }}
-                          style={{
-                            padding: "0.45rem 0.65rem",
-                            borderRadius: "0.45rem",
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
-                            cursor: "pointer",
-                          }}
+                          className="button button--secondary button--small"
                         >
                           edit
                         </button>
@@ -476,14 +355,7 @@ export function TransactionsPage() {
                         <button
                           type="button"
                           onClick={() => handleDelete(row)}
-                          style={{
-                            padding: "0.45rem 0.65rem",
-                            borderRadius: "0.45rem",
-                            border: "1px solid #fecaca",
-                            background: "#fef2f2",
-                            color: "#991b1b",
-                            cursor: "pointer",
-                          }}
+                          className="button button--danger button--small"
                         >
                           delete
                         </button>
@@ -495,13 +367,7 @@ export function TransactionsPage() {
 
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={8}
-                    style={{
-                      padding: "1rem 0.5rem",
-                      color: "#6b7280",
-                    }}
-                  >
+                  <td colSpan={8} className="text-muted">
                     {hasActiveFilters
                       ? "no transactions match the current filters for this month. try clearing filters."
                       : "no transactions for this month yet. suspiciously peaceful."}

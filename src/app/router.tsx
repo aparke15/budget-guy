@@ -5,6 +5,7 @@ import { AccountsPage } from "../features/accounts/accounts-page";
 import { BudgetPage } from "../features/budgets/budget-page";
 import { DashboardPage } from "../features/dashboard/dashboard-page";
 import { ForecastPage } from "../features/forecast/forecast-page";
+import { RecurringPage } from "../features/recurring/recurring-page";
 import { SettingsPage } from "../features/settings/settings-page";
 import { TransactionsPage } from "../features/transactions/transactions-page";
 
@@ -24,6 +25,10 @@ export const router = createBrowserRouter([
       {
         path: "accounts",
         element: <AccountsPage />,
+      },
+      {
+        path: "recurring",
+        element: <RecurringPage />,
       },
       {
         path: "forecast",

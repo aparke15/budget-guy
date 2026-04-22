@@ -1,108 +1,91 @@
-import { NavLink, Outlet } from "react-router-dom";
+import "./app.css";
 
-function getNavLinkStyle(isActive: boolean): React.CSSProperties {
-  return {
-    padding: "0.5rem 0.75rem",
-    borderRadius: "0.5rem",
-    textDecoration: "none",
-    color: isActive ? "#111827" : "#4b5563",
-    background: isActive ? "#e5e7eb" : "transparent",
-    fontWeight: isActive ? 600 : 500,
-  };
-}
+import { NavLink, Outlet } from "react-router-dom";
 
 export default function App() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#f9fafb",
-        color: "#111827",
-        fontFamily:
-          "Inter, ui-sans-serif, system-ui, -apple-system, sans-serif",
-      }}
-    >
-      <header
-        style={{
-          borderBottom: "1px solid #e5e7eb",
-          background: "#ffffff",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "1100px",
-            margin: "0 auto",
-            padding: "1rem 1.25rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "1rem",
-          }}
-        >
-          <div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>
-              budget mvp
-            </div>
-            <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="shell-inner app-header-inner">
+          <div className="brand">
+            <div className="brand-title">budget mvp</div>
+            <div className="brand-subtitle">
               local-first and gloriously unbank-synced
             </div>
           </div>
 
-          <nav
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              flexWrap: "wrap",
-            }}
-          >
-            <NavLink to="/" end>
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>dashboard</span>
-              )}
+          <nav className="app-nav" aria-label="Primary">
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) =>
+                `nav-link${isActive ? " active" : ""}`
+              }
+            >
+              dashboard
             </NavLink>
 
-            <NavLink to="/transactions">
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>transactions</span>
-              )}
+            <NavLink
+              to="/transactions"
+              className={({ isActive }) =>
+                `nav-link${isActive ? " active" : ""}`
+              }
+            >
+              transactions
             </NavLink>
 
-            <NavLink to="/accounts">
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>accounts</span>
-              )}
+            <NavLink
+              to="/budget"
+              className={({ isActive }) =>
+                `nav-link${isActive ? " active" : ""}`
+              }
+            >
+              budgets
             </NavLink>
 
-            <NavLink to="/forecast">
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>forecast</span>
-              )}
+            <NavLink
+              to="/accounts"
+              className={({ isActive }) =>
+                `nav-link${isActive ? " active" : ""}`
+              }
+            >
+              accounts
             </NavLink>
 
-            <NavLink to="/budget">
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>budget</span>
-              )}
+            <NavLink
+              to="/recurring"
+              className={({ isActive }) =>
+                `nav-link${isActive ? " active" : ""}`
+              }
+            >
+              recurring
             </NavLink>
 
-            <NavLink to="/settings">
-              {({ isActive }) => (
-                <span style={getNavLinkStyle(isActive)}>settings</span>
-              )}
+            <NavLink
+              to="/forecast"
+              className={({ isActive }) =>
+                `nav-link${isActive ? " active" : ""}`
+              }
+            >
+              forecast
+            </NavLink>
+
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                `nav-link${isActive ? " active" : ""}`
+              }
+            >
+              settings
             </NavLink>
           </nav>
         </div>
       </header>
 
-      <main
-        style={{
-          maxWidth: "1100px",
-          margin: "0 auto",
-          padding: "1.5rem 1.25rem 3rem",
-        }}
-      >
-        <Outlet />
+      <main className="app-main">
+        <div className="shell-inner">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
