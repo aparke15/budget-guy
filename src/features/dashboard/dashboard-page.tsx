@@ -4,6 +4,7 @@ import { useAppStore } from "../../app/store";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents, getBudgetRows, getMonthlySummary } from "../../lib/money";
 import { inputStyle, primaryButtonStyle } from "../components/style-constants";
+import { RecurringGenerationFeedback } from "../recurring/recurring-generation-feedback";
 
 function Card(props: {
   title: string;
@@ -34,6 +35,9 @@ export function DashboardPage() {
   const generateRecurringForMonth = useAppStore(
     (state) => state.generateRecurringForMonth
   );
+  const generationSummary = useAppStore(
+    (state) => state.lastRecurringGenerationSummary
+  );
 
   const summary = useMemo(
     () => getMonthlySummary(transactions, budgets, month),
@@ -47,6 +51,10 @@ export function DashboardPage() {
 
   const overBudget = budgetRows.filter((row) => row.overBudget);
   const recentTransactions = transactions.slice(0, 8);
+
+  function handleGenerateRecurring() {
+    generateRecurringForMonth(month);
+  }
 
   return (
     <section className="page">
@@ -71,13 +79,15 @@ export function DashboardPage() {
 
           <button
             type="button"
-            onClick={() => generateRecurringForMonth(month)}
+            onClick={handleGenerateRecurring}
             style={primaryButtonStyle}
           >
             generate recurring
           </button>
         </div>
       </div>
+
+      {generationSummary ? <RecurringGenerationFeedback summary={generationSummary} /> : null}
 
       <div className="summary-grid">
         <Card title="income" value={formatCents(summary.incomeCents)} />

@@ -303,10 +303,13 @@ describe("app store", () => {
     });
     const { useAppStore, localStorage } = await loadStore(persisted);
 
+    useAppStore.getState().generateRecurringForMonth("2026-04");
+
     useAppStore.getState().replacePersistedState(replacement);
 
     expect(useAppStore.getState().accounts).toEqual(replacement.accounts);
     expect(useAppStore.getState().categories).toEqual(replacement.categories);
+    expect(useAppStore.getState().lastRecurringGenerationSummary).toBeNull();
     expect(JSON.parse(localStorage.getItem(storagekey) ?? "null")).toEqual(replacement);
   });
 
@@ -433,9 +436,16 @@ describe("app store", () => {
     });
     const { useAppStore, localStorage } = await loadStore(persisted);
 
-    useAppStore.getState().generateRecurringForMonth("2026-04");
+    const firstSummary = useAppStore.getState().generateRecurringForMonth("2026-04");
 
     expect(useAppStore.getState().transactions).toHaveLength(2);
+    expect(firstSummary).toEqual(useAppStore.getState().lastRecurringGenerationSummary);
+    expect(useAppStore.getState().lastRecurringGenerationSummary).toMatchObject({
+      month: "2026-04",
+      createdTransactions: 1,
+      createdTransfers: 0,
+      duplicateOccurrences: 0,
+    });
     expect(useAppStore.getState().transactions[0]).toMatchObject({
       id: "generated-uuid-1",
       kind: "standard",
@@ -453,9 +463,16 @@ describe("app store", () => {
       "txn-existing",
     ]);
 
-    useAppStore.getState().generateRecurringForMonth("2026-04");
+    const secondSummary = useAppStore.getState().generateRecurringForMonth("2026-04");
 
     expect(useAppStore.getState().transactions).toHaveLength(2);
+    expect(secondSummary).toEqual(useAppStore.getState().lastRecurringGenerationSummary);
+    expect(useAppStore.getState().lastRecurringGenerationSummary).toMatchObject({
+      month: "2026-04",
+      createdTransactions: 0,
+      createdTransfers: 0,
+      duplicateOccurrences: 1,
+    });
 
     const saved = JSON.parse(localStorage.getItem(storagekey) ?? "null") as PersistedState;
 
@@ -734,6 +751,8 @@ describe("app store", () => {
     });
     const { useAppStore, localStorage } = await loadStore(persisted);
 
+    useAppStore.getState().generateRecurringForMonth("2026-04");
+
     useAppStore.getState().resetSeedData();
 
     const seeded = createSeedState();
@@ -742,6 +761,7 @@ describe("app store", () => {
     expect(useAppStore.getState().categories).toEqual(seeded.categories);
     expect(useAppStore.getState().budgets).toEqual(seeded.budgets);
     expect(useAppStore.getState().recurringRules).toEqual(seeded.recurringRules);
+    expect(useAppStore.getState().lastRecurringGenerationSummary).toBeNull();
     expect(useAppStore.getState().transactions).toEqual(
       [...seeded.transactions].sort((left, right) =>
         right.date.localeCompare(left.date)

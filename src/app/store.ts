@@ -1,17 +1,22 @@
 import { create } from "zustand";
 
 import { hasBudgetForMonthCategory } from "../features/budgets/budget-page-helpers";
-import { generateOccurrencesForMonth, getNowIso } from "../lib/dates";
+import { getNowIso } from "../lib/dates";
 import {
   createOpeningBalanceTransaction,
   createTransferTransactions,
 } from "../lib/factories";
+import {
+  createEmptyRecurringGenerationSummary,
+  generateRecurringTransactionsForMonth,
+} from "../lib/recurring-generation";
 import { createSeedState } from "../seed/seed-data";
 import type {
   Account,
   Budget,
   Category,
   PersistedState,
+  RecurringGenerationSummary,
   RecurringRule,
   Transaction,
 } from "../types";
@@ -27,6 +32,7 @@ type AppState = {
   transactions: Transaction[];
   budgets: Budget[];
   recurringRules: RecurringRule[];
+  lastRecurringGenerationSummary: RecurringGenerationSummary | null;
 
   addAccount: (input: Account) => void;
   updateAccount: (id: string, input: Partial<Account>) => void;
@@ -75,7 +81,7 @@ type AppState = {
 
   replacePersistedState: (state: PersistedState) => void;
 
-  generateRecurringForMonth: (month: string) => void;
+  generateRecurringForMonth: (month: string) => RecurringGenerationSummary;
   resetSeedData: () => void;
 };
 
@@ -217,6 +223,7 @@ export const useAppStore = create<AppState>((set) => ({
   transactions: sortTransactions(initialData.transactions),
   budgets: initialData.budgets,
   recurringRules: initialData.recurringRules,
+  lastRecurringGenerationSummary: null,
 
   addAccount: (input) =>
     set((state) => ({
@@ -518,63 +525,38 @@ export const useAppStore = create<AppState>((set) => ({
       transactions: sortTransactions(persistedState.transactions),
       budgets: persistedState.budgets,
       recurringRules: persistedState.recurringRules,
+      lastRecurringGenerationSummary: null,
     }),
 
-  generateRecurringForMonth: (month) =>
+  generateRecurringForMonth: (month) => {
+    let summary = createEmptyRecurringGenerationSummary(month);
+
     set((state) => {
-      const generatedTransactions = state.recurringRules
-        .filter((rule) => rule.active)
-        .flatMap((rule) =>
-          generateOccurrencesForMonth(rule, month, state.transactions)
-        )
-        .flatMap<Transaction>((occurrence) => {
-          if (occurrence.kind === "transfer" && occurrence.toAccountId) {
-            return createTransferTransactions({
-              input: {
-                date: occurrence.date,
-                fromAccountId: occurrence.accountId,
-                toAccountId: occurrence.toAccountId,
-                amountCents: occurrence.amountCents,
-                note: occurrence.note,
-              },
-              metadata: {
-                source: "recurring",
-                recurringRuleId: occurrence.recurringRuleId,
-              },
-            });
-          }
+      const generation = generateRecurringTransactionsForMonth(
+        state.recurringRules,
+        state.transactions,
+        month
+      );
 
-          const now = getNowIso();
+      summary = generation.summary;
 
-          return [
-            {
-              id: crypto.randomUUID(),
-              kind: "standard",
-              date: occurrence.date,
-              amountCents: occurrence.amountCents,
-              accountId: occurrence.accountId,
-              categoryId: occurrence.categoryId,
-              merchant: occurrence.merchant,
-              note: occurrence.note,
-              source: "recurring",
-              recurringRuleId: occurrence.recurringRuleId,
-              createdAt: now,
-              updatedAt: now,
-            },
-          ];
-        });
-
-      if (generatedTransactions.length === 0) {
-        return {};
+      if (generation.transactions.length === 0) {
+        return {
+          lastRecurringGenerationSummary: generation.summary,
+        };
       }
 
       return {
         transactions: sortTransactions([
           ...state.transactions,
-          ...generatedTransactions,
+          ...generation.transactions,
         ]),
+        lastRecurringGenerationSummary: generation.summary,
       };
-    }),
+    });
+
+    return summary;
+  },
 
   resetSeedData: () => {
     const seeded = createSeedState();
@@ -585,6 +567,7 @@ export const useAppStore = create<AppState>((set) => ({
       transactions: sortTransactions(seeded.transactions),
       budgets: seeded.budgets,
       recurringRules: seeded.recurringRules,
+      lastRecurringGenerationSummary: null,
     });
   },
 }));

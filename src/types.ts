@@ -100,6 +100,25 @@ export type GeneratedRecurringOccurrence = {
   note?: string;
 };
 
+export type RecurringGenerationRuleSummary = {
+  recurringRuleId: string;
+  ruleName: string;
+  kind: RecurringRuleKind;
+  createdOccurrences: number;
+  createdTransactions: number;
+  createdTransfers: number;
+  duplicateOccurrences: number;
+};
+
+export type RecurringGenerationSummary = {
+  month: string;
+  createdOccurrences: number;
+  createdTransactions: number;
+  createdTransfers: number;
+  duplicateOccurrences: number;
+  ruleResults: RecurringGenerationRuleSummary[];
+};
+
 export type PersistedState = {
   version: 1;
   accounts: Account[];

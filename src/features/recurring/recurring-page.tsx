@@ -30,6 +30,7 @@ import {
   updateRecurringKind,
   updateRecurringStartDate,
 } from "./recurring-helpers";
+import { RecurringGenerationFeedback } from "./recurring-generation-feedback";
 
 function getRuleKindBadgeClass(kind: RecurringRuleFormValues["kind"] | "standard" | "transfer") {
   return kind === "transfer" ? "badge badge--transfer" : "badge badge--recurring";
@@ -46,6 +47,9 @@ export function RecurringPage() {
   const deleteRecurringRule = useAppStore((state) => state.deleteRecurringRule);
   const generateRecurringForMonth = useAppStore(
     (state) => state.generateRecurringForMonth
+  );
+  const generationSummary = useAppStore(
+    (state) => state.lastRecurringGenerationSummary
   );
 
   const [month, setMonth] = useState(getCurrentMonth());
@@ -237,6 +241,10 @@ export function RecurringPage() {
     }
   }
 
+  function handleGenerateRecurring() {
+    generateRecurringForMonth(month);
+  }
+
   return (
     <section className="page">
       <div className="page-header">
@@ -265,13 +273,20 @@ export function RecurringPage() {
 
           <button
             type="button"
-            onClick={() => generateRecurringForMonth(month)}
+            onClick={handleGenerateRecurring}
             style={primaryButtonStyle}
           >
             generate recurring
           </button>
         </div>
       </div>
+
+      {generationSummary ? (
+        <RecurringGenerationFeedback
+          summary={generationSummary}
+          showRuleBreakdown
+        />
+      ) : null}
 
       <div className="summary-grid">
         <div className="summary-card">

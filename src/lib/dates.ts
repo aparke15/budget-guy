@@ -19,6 +19,23 @@ import type {
   Transaction,
 } from "../types";
 
+function buildGeneratedRecurringOccurrence(
+  rule: RecurringRule,
+  date: string
+): GeneratedRecurringOccurrence {
+  return {
+    recurringRuleId: rule.id,
+    kind: rule.kind,
+    date,
+    amountCents: rule.kind === "transfer" ? Math.abs(rule.amountCents) : rule.amountCents,
+    accountId: rule.accountId,
+    toAccountId: rule.toAccountId,
+    categoryId: rule.categoryId,
+    merchant: rule.kind === "standard" ? rule.merchant : undefined,
+    note: rule.note,
+  };
+}
+
 export function getMonthKey(date: string): string {
   return date.slice(0, 7);
 }
@@ -99,74 +116,28 @@ export function getFirstWeekdayOnOrAfter(
   return format(candidate, "yyyy-MM-dd");
 }
 
-export function generateOccurrencesForMonth(
+export function getRecurringOccurrenceDatesForMonth(
   rule: RecurringRule,
-  month: string,
-  transactions: Transaction[]
-): GeneratedRecurringOccurrence[] {
+  month: string
+): string[] {
   if (!rule.active) {
     return [];
   }
 
-  const existingDates = new Set(
-    transactions
-      .filter((transaction) => transaction.recurringRuleId === rule.id)
-      .map((transaction) => transaction.date)
-  );
-
-  const occurrences: GeneratedRecurringOccurrence[] = [];
-
   if (rule.frequency === "monthly") {
     const date = getMonthlyOccurrenceDate(month, rule.dayOfMonth!);
 
-    if (
-      isDateWithinBounds(date, rule.startDate, rule.endDate) &&
-      !existingDates.has(date)
-    ) {
-      occurrences.push({
-        recurringRuleId: rule.id,
-        kind: rule.kind,
-        date,
-        amountCents:
-          rule.kind === "transfer"
-            ? Math.abs(rule.amountCents)
-            : rule.amountCents,
-        accountId: rule.accountId,
-        toAccountId: rule.toAccountId,
-        categoryId: rule.categoryId,
-        merchant: rule.kind === "standard" ? rule.merchant : undefined,
-        note: rule.note,
-      });
-    }
-
-    return occurrences;
+    return isDateWithinBounds(date, rule.startDate, rule.endDate) ? [date] : [];
   }
 
   if (rule.frequency === "yearly") {
     const date = getYearlyOccurrenceDate(month, rule.startDate);
 
-    if (
-      date &&
-      isDateWithinBounds(date, rule.startDate, rule.endDate) &&
-      !existingDates.has(date)
-    ) {
-      occurrences.push({
-        recurringRuleId: rule.id,
-        kind: rule.kind,
-        date,
-        amountCents:
-          rule.kind === "transfer"
-            ? Math.abs(rule.amountCents)
-            : rule.amountCents,
-        accountId: rule.accountId,
-        toAccountId: rule.toAccountId,
-        categoryId: rule.categoryId,
-        merchant: rule.kind === "standard" ? rule.merchant : undefined,
-        note: rule.note,
-      });
+    if (!date) {
+      return [];
     }
 
-    return occurrences;
+    return isDateWithinBounds(date, rule.startDate, rule.endDate) ? [date] : [];
   }
 
   const monthStart = startOfMonth(parseISO(`${month}-01`));
@@ -175,6 +146,7 @@ export function generateOccurrencesForMonth(
     getFirstWeekdayOnOrAfter(rule.startDate, rule.dayOfWeek!)
   );
   const intervalDays = rule.frequency === "weekly" ? 7 : 14;
+  const dates: string[] = [];
 
   for (const day of eachDayOfInterval({ start: monthStart, end: monthEnd })) {
     if (getDay(day) !== rule.dayOfWeek) {
@@ -197,23 +169,28 @@ export function generateOccurrencesForMonth(
       continue;
     }
 
-    if (existingDates.has(date)) {
-      continue;
-    }
-
-    occurrences.push({
-      recurringRuleId: rule.id,
-      kind: rule.kind,
-      date,
-      amountCents:
-        rule.kind === "transfer" ? Math.abs(rule.amountCents) : rule.amountCents,
-      accountId: rule.accountId,
-      toAccountId: rule.toAccountId,
-      categoryId: rule.categoryId,
-      merchant: rule.kind === "standard" ? rule.merchant : undefined,
-      note: rule.note,
-    });
+    dates.push(date);
   }
 
-  return occurrences;
+  return dates;
+}
+
+export function generateOccurrencesForMonth(
+  rule: RecurringRule,
+  month: string,
+  transactions: Transaction[]
+): GeneratedRecurringOccurrence[] {
+  if (!rule.active) {
+    return [];
+  }
+
+  const existingDates = new Set(
+    transactions
+      .filter((transaction) => transaction.recurringRuleId === rule.id)
+      .map((transaction) => transaction.date)
+  );
+
+  return getRecurringOccurrenceDatesForMonth(rule, month)
+    .filter((date) => !existingDates.has(date))
+    .map((date) => buildGeneratedRecurringOccurrence(rule, date));
 }
