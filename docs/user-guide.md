@@ -14,6 +14,8 @@ What it does today:
 - Uses transactions as the source of truth for actual money movement.
 - Lets you generate recurring transactions manually for a selected month.
 - Lets you export a JSON backup and import a replacement backup.
+- Lets you switch between light and dark mode, with your preference saved on this device.
+   - If you have not chosen a theme yet, the app follows your system preference on first load.
 
 Important rules to know:
 - You enter money as normal currency values like `12.34`, but the app stores amounts internally as integer cents.
@@ -32,19 +34,20 @@ Important rules to know:
 ## 2. Quick start
 
 Recommended first-time setup:
-1. Open **Settings**.
+1. Open **Accounts**.
 2. Add your accounts, such as checking, savings, cash, or credit card.
    - You can optionally set an opening balance and date.
    - For credit accounts, you can optionally set a credit limit.
-3. Add your categories.
+3. Open **Settings** and add your categories.
    - Use **income** categories for paychecks or other income.
    - Use **expense** categories for spending categories like rent, groceries, or dining.
-4. If you have repeating income or bills, add recurring rules in **Settings**.
+4. If you have repeating income or bills, add recurring rules in **Recurring**.
 5. Open **Transactions** and start recording real transactions or transfers.
 6. Open **Budget** and enter planned monthly amounts for your expense categories.
 7. Use **Accounts** to review balances and account history.
 8. Use **Forecast** to review projected balances from recurring rules.
 9. Use **Dashboard** to review the month and manually generate recurring transactions when needed.
+10. Use the header theme toggle if you prefer light or dark mode.
 
 If there is no saved data yet, the app starts with demo seed data so you can see how it works.
 
@@ -52,7 +55,7 @@ If there is no saved data yet, the app starts with demo seed data so you can see
 
 Use this order each month:
 
-1. **Check your setup in Settings**
+1. **Check your setup in Accounts, Settings, and Recurring**
    - Make sure the accounts and categories you need already exist.
    - Add or update opening balances if you are starting from an existing real-world balance.
    - Add a credit limit for credit accounts if you want available-credit display.
@@ -131,14 +134,17 @@ Use the accounts page to review ledger-derived balances and monthly history.
 
 What you can do:
 - See all accounts in a current balances table.
+- Add, edit, and delete accounts inline.
 - Click an account to review its monthly history.
 - Switch history range between **last 6 months**, **last 12 months**, and **all**.
+- Set or update optional opening balances and opening balance dates.
+- Set or update optional credit limits for credit accounts.
 
 How to read balances:
-- For checking, savings, and cash accounts, the app shows a standard **balance**.
-- For credit accounts, the app shows **owed** instead of a signed negative balance.
-   - If the ledger balance is `-50.00`, the account displays **owed 50.00**.
-   - If the ledger balance is `0.00` or positive, the account displays **owed 0.00**.
+- Every account shows a signed **balance**.
+   - Positive values are shown in green.
+   - Negative values are shown in red.
+   - Zero stays in the default text color.
 - If a credit account has a credit limit, the page also shows:
    - **limit**
    - **available credit**
@@ -147,9 +153,38 @@ How to read history:
 - **Inflows** are positive amounts into that account.
 - **Outflows** are negative amounts out of that account, shown as positive movement totals.
 - **Net change** is inflows minus outflows for that month.
-- The final column is the month-end balance view:
-   - **closing balance** for non-credit accounts
-   - **closing owed** for credit accounts
+- The final column is the month-end **closing balance** for that account.
+
+Delete behavior on this page:
+- Deleting an account also deletes linked transactions and linked recurring rules.
+- The page shows a confirmation panel with the expected cascade impact before you confirm.
+
+### Recurring
+
+Use the recurring page to manage repeating income, bills, and transfers.
+
+What you can do:
+- Pick a month for manual recurring generation.
+- Click **generate recurring** for that month.
+- Review summary counts for rules, active rules, and generated transactions.
+- Add, edit, duplicate, and delete recurring rules inline.
+- Create either **standard** recurring rules or **transfer** recurring rules.
+- Choose monthly, weekly, biweekly, or yearly frequency.
+
+How recurring rules behave:
+- Standard recurring rules require an account, category, start date, and amount.
+- Transfer recurring rules require a source account, destination account, start date, and amount.
+- For standard recurring rules, the saved sign follows the selected category kind:
+   - income category -> positive amount
+   - expense category -> negative amount
+- Transfer recurring rules generate linked transfer pairs.
+- Saving a recurring rule does **not** create a transaction yet.
+- Transactions are only created when you manually run **generate recurring**.
+
+Helpful feedback on this page:
+- The page shows whether rules are active or inactive.
+- It shows how many transactions were already generated from each rule.
+- After a recurring run, the feedback panel summarizes what was created and what was skipped.
 
 ### Forecast
 
@@ -166,7 +201,7 @@ Important behavior:
 - Only recurring rules affect future projections.
 - Budgets do not affect forecast balances.
 - Transfer recurring rules affect projected account balances but do not count as projected income or projected expenses.
-- Credit accounts display projected **owed** and, if a limit exists, projected **available credit**.
+- Credit accounts keep the same signed projected balance display and, if a limit exists, also show projected **available credit**.
 
 ### Transactions
 
@@ -218,7 +253,7 @@ Transfer behavior:
 Opening-balance behavior on this page:
 - Opening balances may appear in the transactions list as labeled rows.
 - They are part of the account ledger.
-- They are edited from **Settings**, not from the general transaction form.
+- They are edited from **Accounts**, not from the general transaction form.
 
 Credit account behavior on this page:
 - Credit accounts use the same transaction signs as every other account.
@@ -246,12 +281,14 @@ What you can do:
 How budgeting works here:
 - Budgets are monthly planned amounts per category.
 - Only expense categories are budgeted on this page.
+- Every expense category gets a row automatically.
 - Actual spending is based on expense transactions in the selected month.
 - Remaining = planned minus actual.
 - A negative remaining amount means the category is over budget.
 
 Useful behavior to know:
 - As you type new planned amounts, row totals and summary values update immediately, even before saving.
+- You do not add or remove budgets manually; the page is driven by the current expense categories.
 - Saving creates a monthly budget record if one does not exist yet.
 - Saving updates the existing monthly budget record if it already exists.
 
@@ -267,51 +304,15 @@ Use settings to manage the app's core setup.
 What you can do:
 - Export a JSON backup.
 - Import a JSON backup that replaces the current dataset.
-- Add, edit, and delete accounts.
 - Add, edit, and delete categories.
-- Add, edit, and delete recurring rules.
 - Review simple usage counts before deleting items.
 - Use **reset seed data**.
-
-#### Accounts
-- Accounts are the places transactions belong to, such as checking, savings, cash, or credit card.
-- Account names must be unique.
-- You can optionally set an opening balance and opening balance date.
-   - A non-zero opening balance creates or updates a special opening-balance transaction.
-   - Clearing the amount removes that opening-balance transaction.
-- For credit accounts, you can optionally set a credit limit.
-- Deleting an account also deletes linked transactions and linked recurring rules.
-
-Credit account notes:
-- The app does not use a special credit transaction model.
-- It uses the same signed ledger as all other accounts.
-- What changes is the display:
-   - negative ledger balance -> money owed
-   - positive inflows into the credit account -> reduced owed
-   - optional limit -> available credit display
 
 #### Categories
 - Categories classify income and spending.
 - Category names must be unique.
 - Each category is either **income** or **expense**.
 - Deleting a category also deletes linked budgets, linked transactions, and linked recurring rules.
-
-#### Recurring rules
-- Recurring rules are templates for future repeating activity.
-- They can be monthly, weekly, biweekly, or yearly.
-- They can be either:
-   - **standard** recurring rules
-   - **transfer** recurring rules
-- Standard recurring rules require an account, category, start date, and amount.
-- Transfer recurring rules require a source account, destination account, start date, and amount.
-- You can optionally set an end date, merchant, note, and whether the rule is active.
-- For standard recurring rules, the amount sign follows the selected category kind:
-  - Income category -> positive amount
-  - Expense category -> negative amount
-- For transfer recurring rules, the amount is stored as a positive transfer amount and generated as a linked pair.
-- Saving a recurring rule does **not** create a transaction immediately.
-- You still need to go to **Dashboard** and run **generate recurring** for a month.
-- Deleting a recurring rule removes the rule only. Previously generated transactions stay in history.
 
 #### Backup import/export
 - **export json backup** downloads the full current persisted dataset.
@@ -324,15 +325,15 @@ Credit account notes:
 - It replaces the current in-app data with the built-in demo seed data.
 - That includes accounts, categories, transactions, budgets, and recurring rules.
 - Use it carefully, especially if you have entered real data you want to keep.
-- The current UI does not show a confirmation step before resetting.
+- The current UI asks for confirmation before resetting.
 
 ## 5. How recurring transactions work
 
-Recurring rules are managed in **Settings**, but generated on **Dashboard**.
+Recurring rules are managed on **Recurring**, and they can be generated from **Recurring** or **Dashboard**.
 
 Recommended recurring workflow:
 1. Create the needed accounts first, plus a category if you are creating a standard recurring rule.
-2. Add a recurring rule in **Settings**.
+2. Add a recurring rule in **Recurring**.
 3. Choose the correct kind and frequency:
    - standard or transfer
    - monthly
@@ -344,6 +345,8 @@ Recommended recurring workflow:
 6. Select the month.
 7. Click **generate recurring**.
 8. Review the created transactions on the **Transactions** page.
+
+You can also run **generate recurring** from the **Recurring** page if you are already working there.
 
 Important behavior:
 - Generated recurring entries become normal saved transactions with source `recurring`.
@@ -357,18 +360,19 @@ Important behavior:
 
 - Set up accounts and categories before entering lots of transactions.
 - Add opening balances when you first set up real accounts so ledger-derived balances start from the right place.
+- Set your preferred light or dark theme from the header toggle; the app remembers it on this device.
 - Use income categories only for money coming in, and expense categories only for money going out.
 - Enter amounts as normal currency values. The app handles cents internally for accuracy.
 - On transaction forms, enter a positive amount and let the selected type decide whether it becomes income or expense.
 - For transfers, enter a positive amount and let the app create the negative/positive pair.
-- For credit accounts, remember that a negative purchase increases **owed**, and a positive payment or refund reduces **owed**.
+- For credit accounts, remember that purchases usually push the signed balance further negative, while payments or refunds move it back toward zero or positive.
 - If a budget looks off, check whether the related transactions were categorized correctly.
 - If an account balance looks off, check for transfers and opening-balance entries as well as standard transactions.
 - If a recurring transaction is missing, confirm all of these:
   - the rule is active
    - the rule has valid account references and, for standard rules, a valid category
   - the selected month contains a matching occurrence
-  - you manually clicked **generate recurring** on the dashboard
+   - you manually clicked **generate recurring** on the dashboard or recurring page
 - If you delete an account or category, linked records are removed too.
 - Export a backup before doing major cleanup or importing replacement data.
 - The app is local-first, so data stays in this browser storage unless you reset it or clear browser storage.
@@ -383,8 +387,7 @@ Current MVP limitations:
 - There is no bank sync.
 - There is no CSV import.
 - There are no split transactions.
-- Recurring rule management currently lives in **Settings**.
 - Recurring rules do not auto-run; you must generate them manually.
-- Credit account support is limited to owed and available-credit display.
+- Credit account support is limited to signed balance display, credit limits, and available-credit display.
 - There is no interest, APR, statement cycle, due-date, or minimum-payment logic.
 - The app is best treated as a manual budgeting ledger, not a fully automated finance system.

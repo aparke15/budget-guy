@@ -5,14 +5,11 @@ import { inputStyle } from "../components/style-constants";
 import { buildForecast, type ForecastHorizon } from "../../lib/forecast";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents } from "../../lib/money";
-import {
-  getAvailableCreditCents,
-  getDisplayedAccountBalanceCents,
-} from "../../lib/account-balances";
+import { getAvailableCreditCents } from "../../lib/account-balances";
 
 const tableCellStyle = {
   padding: "0.7rem 0.55rem",
-  borderBottom: "1px solid #f3f4f6",
+  borderBottom: "1px solid var(--border-subtle)",
 } as const;
 
 export function ForecastPage() {
@@ -41,7 +38,7 @@ export function ForecastPage() {
 
         </div>
 
-        <div className="section-card">
+        <div className="section-card section-card--surface">
           <p className="empty-state">
             no accounts yet. add accounts and recurring rules to see a forecast.
           </p>
@@ -105,14 +102,14 @@ export function ForecastPage() {
       </div>
 
       {recurringRules.length === 0 ? (
-        <div className="section-card">
+        <div className="section-card section-card--surface">
           <p className="empty-state">
             no recurring rules yet. projected summaries stay flat and projected balances match current balances.
           </p>
         </div>
       ) : null}
 
-      <div className="section-card">
+      <div className="section-card section-card--surface">
         <h2 className="section-title">monthly projected summary</h2>
 
         <div className="table-wrap">
@@ -120,25 +117,43 @@ export function ForecastPage() {
             <thead>
               <tr>
                 <th style={tableCellStyle}>month</th>
-                <th style={tableCellStyle}>projected income</th>
-                <th style={tableCellStyle}>projected expenses</th>
-                <th style={tableCellStyle}>projected net</th>
+                <th className="money-column" style={tableCellStyle}>projected income</th>
+                <th className="money-column" style={tableCellStyle}>projected expenses</th>
+                <th className="money-column" style={tableCellStyle}>projected net</th>
               </tr>
             </thead>
             <tbody>
               {forecast.monthlySummaryRows.map((row) => (
-                <tr key={row.month} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                <tr key={row.month}>
                   <td style={tableCellStyle}>{row.month}</td>
-                  <td style={{ ...tableCellStyle, color: "#166534", fontWeight: 600 }}>
+                  <td
+                    className="money-column"
+                    style={{
+                      ...tableCellStyle,
+                      color: "var(--text-positive)",
+                      fontWeight: 600,
+                    }}
+                  >
                     {formatCents(row.projectedIncomeCents)}
                   </td>
-                  <td style={{ ...tableCellStyle, color: "#991b1b", fontWeight: 600 }}>
+                  <td
+                    className="money-column"
+                    style={{
+                      ...tableCellStyle,
+                      color: "var(--text-negative)",
+                      fontWeight: 600,
+                    }}
+                  >
                     {formatCents(row.projectedExpenseCents)}
                   </td>
                   <td
+                    className="money-column"
                     style={{
                       ...tableCellStyle,
-                      color: row.projectedNetCents >= 0 ? "#166534" : "#991b1b",
+                      color:
+                        row.projectedNetCents >= 0
+                          ? "var(--text-positive)"
+                          : "var(--text-negative)",
                       fontWeight: 600,
                     }}
                   >
@@ -151,7 +166,7 @@ export function ForecastPage() {
         </div>
       </div>
 
-      <div className="section-card">
+      <div className="section-card section-card--surface">
         <h2 className="section-title">projected account ending balances</h2>
 
         <div className="table-wrap">
@@ -161,7 +176,7 @@ export function ForecastPage() {
                 <th style={tableCellStyle}>account</th>
                 <th style={tableCellStyle}>type</th>
                 {forecast.months.map((month) => (
-                  <th key={month} style={tableCellStyle}>
+                  <th key={month} className="money-column" style={tableCellStyle}>
                     projected {month}
                   </th>
                 ))}
@@ -169,7 +184,7 @@ export function ForecastPage() {
             </thead>
             <tbody>
               {forecast.accountBalanceRows.map((row) => (
-                <tr key={row.accountId} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                <tr key={row.accountId}>
                   <td style={{ ...tableCellStyle, fontWeight: 600 }}>{row.accountName}</td>
                   <td style={tableCellStyle}>
                     <span
@@ -183,55 +198,36 @@ export function ForecastPage() {
                     </span>
                   </td>
                   {row.projectedBalances.map((balancePoint) => (
-                    <td key={balancePoint.month} style={tableCellStyle}>
-                      {row.accountType === "credit" ? (
-                        <div style={{ display: "grid", gap: "0.2rem" }}>
-                          <span
-                            style={{
-                              color:
-                                getDisplayedAccountBalanceCents(
-                                  { type: row.accountType },
-                                  balancePoint.endingBalanceCents
-                                ) > 0
-                                  ? "#991b1b"
-                                  : "#166534",
-                              fontWeight: 600,
-                            }}
-                          >
-                            owed:{" "}
-                            {formatCents(
-                              getDisplayedAccountBalanceCents(
-                                { type: row.accountType },
-                                balancePoint.endingBalanceCents
-                              )
-                            )}
-                          </span>
-                          {row.creditLimitCents != null ? (
-                            <span style={{ color: "#6b7280", fontSize: "0.85rem" }}>
-                              available:{" "}
-                              {formatCents(
-                                getAvailableCreditCents(
-                                  {
-                                    type: row.accountType,
-                                    creditLimitCents: row.creditLimitCents,
-                                  },
-                                  balancePoint.endingBalanceCents
-                                ) ?? 0
-                              )}
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : (
+                    <td key={balancePoint.month} className="money-column" style={tableCellStyle}>
+                      <div style={{ display: "grid", gap: "0.2rem" }}>
                         <span
                           style={{
                             color:
-                              balancePoint.endingBalanceCents >= 0 ? "#166534" : "#991b1b",
+                              balancePoint.endingBalanceCents > 0
+                                ? "var(--text-positive)"
+                                : balancePoint.endingBalanceCents < 0
+                                  ? "var(--text-negative)"
+                                  : "var(--text-default)",
                             fontWeight: 600,
                           }}
                         >
                           {formatCents(balancePoint.endingBalanceCents)}
                         </span>
-                      )}
+                        {row.accountType === "credit" && row.creditLimitCents != null ? (
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                            available:{" "}
+                            {formatCents(
+                              getAvailableCreditCents(
+                                {
+                                  type: row.accountType,
+                                  creditLimitCents: row.creditLimitCents,
+                                },
+                                balancePoint.endingBalanceCents
+                              ) ?? 0
+                            )}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                   ))}
                 </tr>

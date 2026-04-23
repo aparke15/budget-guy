@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDraftSummary,
-  getAvailableBudgetCategories,
   getBudgetEditorRows,
   getDraftPlannedTotal,
   getDraftRemainingCents,
@@ -113,7 +112,7 @@ describe("budget page helpers", () => {
     ).toBe(0);
   });
 
-  it("returns only existing budget rows for the selected month", () => {
+  it("returns one budget row per expense category, defaulting missing plans to zero", () => {
     expect(
       getBudgetEditorRows(
         categories.filter((item) => item.kind === "expense"),
@@ -141,24 +140,34 @@ describe("budget page helpers", () => {
         overBudget: false,
       },
     ]);
-  });
-
-  it("lists only categories without a budget for the selected month", () => {
-    expect(
-      getAvailableBudgetCategories(
-        categories.filter((item) => item.kind === "expense"),
-        budgets,
-        "2026-04"
-      ).map((category) => category.id)
-    ).toEqual([]);
 
     expect(
-      getAvailableBudgetCategories(
+      getBudgetEditorRows(
         categories.filter((item) => item.kind === "expense"),
         budgets,
+        transactions,
         "2026-05"
-      ).map((category) => category.id)
-    ).toEqual(["cat-food"]);
+      )
+    ).toEqual([
+      {
+        budgetId: undefined,
+        categoryId: "cat-food",
+        categoryName: "Food",
+        plannedCents: 0,
+        actualCents: 0,
+        remainingCents: 0,
+        overBudget: false,
+      },
+      {
+        budgetId: "budget-other-month",
+        categoryId: "cat-rent",
+        categoryName: "Rent",
+        plannedCents: 130000,
+        actualCents: 0,
+        remainingCents: 130000,
+        overBudget: false,
+      },
+    ]);
   });
 
   it("detects duplicate budgets for a month and category", () => {

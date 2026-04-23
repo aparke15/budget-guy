@@ -6,7 +6,6 @@ import {
   getAccountMonthlyHistoryRows,
   getAllAccountBalances,
   getDisplayedAccountBalanceCents,
-  getDisplayedAccountBalanceLabel,
 } from "../../lib/account-balances";
 import { getCurrentMonth } from "../../lib/dates";
 import { createAccount } from "../../lib/factories";
@@ -386,7 +385,7 @@ export function AccountsPage() {
         </div>
       </div>
 
-      <div className="section-card">
+      <div className="section-card section-card--surface">
         <div className="section-header">
           <div className="section-title-group">
             <h2 className="section-title">current balances</h2>
@@ -407,31 +406,28 @@ export function AccountsPage() {
                 <tr>
                   <th>account</th>
                   <th>type</th>
-                  <th>current view</th>
-                  <th>limit</th>
-                  <th>available credit</th>
+                  <th className="money-column">balance</th>
+                  <th className="money-column">limit</th>
+                  <th className="money-column">available credit</th>
                 </tr>
               </thead>
               <tbody>
                 {balanceRows.map((row) => {
                   const isSelected = row.accountId === selectedAccountId;
-                  const isCredit = row.accountType === "credit";
-                  const valueClass = isCredit
-                    ? row.displayValueCents > 0
-                      ? "text-negative"
-                      : "text-positive"
-                    : row.displayValueCents >= 0
+                  const valueClass =
+                    row.displayValueCents > 0
                       ? "text-positive"
-                      : "text-negative";
+                      : row.displayValueCents < 0
+                        ? "text-negative"
+                        : "";
 
                   return (
                     <tr
                       key={row.accountId}
                       onClick={() => setSelectedAccountId(row.accountId)}
-                      className={isSelected ? "table-row--selected" : undefined}
-                      style={{ cursor: "pointer" }}
+                      className={isSelected ? "table-row--selected row-clickable" : "row-clickable"}
                     >
-                      <td style={{ fontWeight: isSelected ? 700 : 600 }}>
+                      <td className={isSelected ? "font-bold" : "font-semibold"}>
                         {row.accountName}
                       </td>
                       <td>
@@ -439,15 +435,15 @@ export function AccountsPage() {
                           {row.accountType}
                         </span>
                       </td>
-                      <td className={valueClass} style={{ fontWeight: 700 }}>
-                        {row.displayLabel}: {formatCents(row.displayValueCents)}
+                      <td className={`money-column ${valueClass} font-bold`}>
+                        {formatCents(row.displayValueCents)}
                       </td>
-                      <td>
+                      <td className="money-column">
                         {row.creditLimitCents != null
                           ? formatCents(row.creditLimitCents)
                           : "—"}
                       </td>
-                      <td>
+                      <td className="money-column">
                         {row.availableCreditCents != null
                           ? formatCents(row.availableCreditCents)
                           : "—"}
@@ -465,10 +461,10 @@ export function AccountsPage() {
         <div className="section-card section-card--danger">
           <div className="section-header">
             <div className="section-title-group">
-              <h2 className="section-title" style={{ color: "#991b1b" }}>
+              <h2 className="section-title">
                 {deleteImpact.title}
               </h2>
-              <p className="section-subtitle" style={{ color: "#7f1d1d" }}>
+              <p className="section-subtitle">
                 {deleteImpact.description}
               </p>
             </div>
@@ -514,7 +510,7 @@ export function AccountsPage() {
 
             return editingId === account.id ? (
               <div key={account.id} className="entity-card">
-                <div style={{ width: "100%" }}>
+                <div className="full-width">
                   <AccountEditor
                     values={editValues}
                     error={editError}
@@ -605,7 +601,7 @@ export function AccountsPage() {
         </div>
       </div>
 
-      <div className="section-card">
+      <div className="section-card section-card--surface">
         <div className="section-header">
           <div className="section-title-group">
             <h2 className="section-title">
@@ -627,7 +623,9 @@ export function AccountsPage() {
                   onClick={() => setHistoryRange(option.value)}
                   style={{
                     ...secondaryButtonStyle,
-                    background: active ? "#e5e7eb" : secondaryButtonStyle.background,
+                    background: active
+                      ? "var(--color-surface-hover)"
+                      : secondaryButtonStyle.background,
                   }}
                 >
                   {option.label}
@@ -649,12 +647,10 @@ export function AccountsPage() {
               <thead>
                 <tr>
                   <th>month</th>
-                  <th>inflows</th>
-                  <th>outflows</th>
-                  <th>net change</th>
-                  <th>
-                    closing {selectedAccount.type === "credit" ? "owed" : "balance"}
-                  </th>
+                  <th className="money-column">inflows</th>
+                  <th className="money-column">outflows</th>
+                  <th className="money-column">net change</th>
+                  <th className="money-column">closing balance</th>
                 </tr>
               </thead>
               <tbody>
@@ -663,33 +659,29 @@ export function AccountsPage() {
                     selectedAccount,
                     row.closingBalanceCents
                   );
-                  const closingLabel = getDisplayedAccountBalanceLabel(selectedAccount);
                   const closingClass =
-                    selectedAccount.type === "credit"
-                      ? closingValueCents > 0
+                    closingValueCents > 0
+                      ? "text-positive"
+                      : closingValueCents < 0
                         ? "text-negative"
-                        : "text-positive"
-                      : closingValueCents >= 0
-                        ? "text-positive"
-                        : "text-negative";
+                        : "";
 
                   return (
                     <tr key={row.month}>
                       <td>{row.month}</td>
-                      <td className="text-positive" style={{ fontWeight: 700 }}>
+                      <td className="money-column text-positive font-bold">
                         {formatCents(row.inflowsCents)}
                       </td>
-                      <td className="text-negative" style={{ fontWeight: 700 }}>
+                      <td className="money-column text-negative font-bold">
                         {formatCents(row.outflowsCents)}
                       </td>
                       <td
-                        className={row.netChangeCents >= 0 ? "text-positive" : "text-negative"}
-                        style={{ fontWeight: 700 }}
+                        className={`money-column ${row.netChangeCents >= 0 ? "text-positive" : "text-negative"} font-bold`}
                       >
                         {formatCents(row.netChangeCents)}
                       </td>
-                      <td className={closingClass} style={{ fontWeight: 700 }}>
-                        {closingLabel}: {formatCents(closingValueCents)}
+                      <td className={`money-column ${closingClass} font-bold`}>
+                        {formatCents(closingValueCents)}
                       </td>
                     </tr>
                   );

@@ -22,10 +22,16 @@ export function RecurringGenerationFeedback(props: {
 
   return (
     <div
-      className="section-card"
+      className="section-card section-card--surface"
       style={{
-        borderColor: summary.createdTransactions > 0 ? "#bfdbfe" : "#d1d5db",
-        background: summary.createdTransactions > 0 ? "#eff6ff" : "#f8fafc",
+        borderColor:
+          summary.createdTransactions > 0
+            ? "var(--color-accent-border)"
+            : "var(--border-strong)",
+        background:
+          summary.createdTransactions > 0
+            ? "var(--color-accent-surface)"
+            : "var(--bg-subtle)",
       }}
     >
       <div className="section-header">
@@ -51,22 +57,28 @@ export function RecurringGenerationFeedback(props: {
         className="message-box"
         style={{
           marginTop: "0.9rem",
-          borderColor: summary.createdTransactions > 0 ? "#bfdbfe" : "#d1d5db",
-          background: summary.createdTransactions > 0 ? "#dbeafe" : "#f3f4f6",
-          color: "#1f2937",
+          borderColor:
+            summary.createdTransactions > 0
+              ? "var(--color-accent-border)"
+              : "var(--border-strong)",
+          background:
+            summary.createdTransactions > 0
+              ? "var(--color-accent-surface-strong)"
+              : "var(--bg-muted)",
+          color: "var(--text-default)",
         }}
       >
         {buildRecurringGenerationMessage(summary)}
       </p>
 
       {showRuleBreakdown && summary.ruleResults.length > 0 ? (
-        <div style={{ marginTop: "0.9rem" }}>
+        <div className="stack-sm">
           <div className="section-subtitle" style={{ marginBottom: "0.5rem" }}>
             by rule
           </div>
-          <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
+          <ul className="list-compact list-compact--tight">
             {summary.ruleResults.map((result) => (
-              <li key={result.recurringRuleId} style={{ marginBottom: "0.35rem" }}>
+              <li key={result.recurringRuleId}>
                 {result.ruleName}: created {pluralize(result.createdTransactions, "transaction")}
                 {result.createdTransfers > 0
                   ? ` (${pluralize(result.createdTransfers, "transfer pair")})`

@@ -190,7 +190,7 @@ function CategoriesSection(props: CategoriesSectionProps) {
         {categories.map((category) =>
           editingId === category.id ? (
             <div key={category.id} className="entity-card">
-              <div style={{ width: "100%" }}>
+              <div className="full-width">
                 <CategoryEditor
                   values={editValues}
                   error={editError}
@@ -361,7 +361,7 @@ function DataManagementSection(props: DataManagementSectionProps) {
             type="file"
             accept="application/json,.json"
             onChange={handleImport}
-            style={{ display: "none" }}
+            className="visually-hidden"
           />
         </label>
 
@@ -468,10 +468,10 @@ export function SettingsPage() {
         <div className="section-card section-card--danger">
           <div className="section-header">
             <div className="section-title-group">
-              <h2 className="section-title" style={{ color: "#991b1b" }}>
+              <h2 className="section-title">
                 {deleteImpact.title}
               </h2>
-              <p className="section-subtitle" style={{ color: "#7f1d1d" }}>
+              <p className="section-subtitle">
                 {deleteImpact.description}
               </p>
             </div>

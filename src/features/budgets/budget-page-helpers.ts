@@ -2,7 +2,7 @@ import type { Budget, BudgetRow, Category, MonthlySummary, Transaction } from ".
 import { parseAmountInputToCents, sumCategoryActualCents } from "../../lib/money";
 
 export type BudgetEditorRow = BudgetRow & {
-  budgetId: string;
+  budgetId?: string;
 };
 
 export function hasBudgetForMonthCategory(
@@ -35,37 +35,29 @@ export function getBudgetEditorRows(
   transactions: Transaction[],
   month: string
 ): BudgetEditorRow[] {
-  const expenseCategoryMap = new Map(
-    expenseCategories.map((category) => [category.id, category])
+  const budgetByCategoryId = new Map(
+    budgets
+      .filter((budget) => budget.month === month)
+      .map((budget) => [budget.categoryId, budget])
   );
 
-  return budgets
-    .filter((budget) => budget.month === month)
-    .map((budget) => {
-      const category = expenseCategoryMap.get(budget.categoryId);
-
-      if (!category) {
-        return null;
-      }
-
-      const actualCents = sumCategoryActualCents(
-        transactions,
-        month,
-        budget.categoryId
-      );
-      const remainingCents = budget.plannedCents - actualCents;
+  return expenseCategories
+    .map((category) => {
+      const budget = budgetByCategoryId.get(category.id);
+      const plannedCents = budget?.plannedCents ?? 0;
+      const actualCents = sumCategoryActualCents(transactions, month, category.id);
+      const remainingCents = plannedCents - actualCents;
 
       return {
-        budgetId: budget.id,
+        budgetId: budget?.id,
         categoryId: category.id,
         categoryName: category.name,
-        plannedCents: budget.plannedCents,
+        plannedCents,
         actualCents,
         remainingCents,
         overBudget: remainingCents < 0,
       } satisfies BudgetEditorRow;
     })
-    .filter((row): row is BudgetEditorRow => row != null)
     .sort((left, right) => left.categoryName.localeCompare(right.categoryName));
 }
 

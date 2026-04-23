@@ -104,18 +104,18 @@ export function DashboardPage() {
         />
       </div>
 
-      <div className="summary-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+      <div className="summary-grid summary-grid--wide">
         <div className="section-card">
           <h2 className="section-title">over budget</h2>
 
           {overBudget.length === 0 ? (
-            <p className="empty-state" style={{ color: "#166534" }}>
+            <p className="empty-state text-positive">
               shocking restraint. nothing over budget this month.
             </p>
           ) : (
-            <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
+            <ul className="list-compact">
               {overBudget.map((row) => (
-                <li key={row.categoryId} style={{ marginBottom: "0.4rem" }}>
+                <li key={row.categoryId}>
                   {row.categoryName}: {formatCents(Math.abs(row.remainingCents))}{" "}
                   over
                 </li>
@@ -130,9 +130,9 @@ export function DashboardPage() {
           {budgetRows.length === 0 ? (
             <p className="empty-state">no budget rows for this month yet.</p>
           ) : (
-            <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
+            <ul className="list-compact">
               {budgetRows.slice(0, 5).map((row) => (
-                <li key={row.categoryId} style={{ marginBottom: "0.4rem" }}>
+                <li key={row.categoryId}>
                   {row.categoryName}: {formatCents(row.actualCents)} spent /{" "}
                   {formatCents(row.plannedCents)} planned
                 </li>
@@ -142,7 +142,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="section-card">
+      <div className="section-card section-card--surface">
         <div className="section-header">
           <div className="section-title-group">
             <h2 className="section-title">recent transactions</h2>
@@ -157,7 +157,7 @@ export function DashboardPage() {
                 <th>date</th>
                 <th>details</th>
                 <th>badges</th>
-                <th>amount</th>
+                <th className="money-column">amount</th>
               </tr>
             </thead>
             <tbody>
@@ -211,14 +211,13 @@ export function DashboardPage() {
                       </div>
                     </td>
                     <td
-                      className={
+                      className={`money-column ${
                         transaction.kind === "transfer"
-                          ? "text-info"
+                          ? "text-info font-bold"
                           : transaction.amountCents >= 0
-                            ? "text-positive"
-                            : "text-negative"
-                      }
-                      style={{ fontWeight: 700 }}
+                            ? "text-positive font-bold"
+                            : "text-negative font-bold"
+                      }`}
                     >
                       {formatCents(transaction.amountCents)}
                     </td>

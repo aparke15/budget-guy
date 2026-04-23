@@ -312,10 +312,10 @@ export function RecurringPage() {
         <div className="section-card section-card--danger">
           <div className="section-header">
             <div className="section-title-group">
-              <h2 className="section-title" style={{ color: "#991b1b" }}>
+              <h2 className="section-title">
                 {deleteImpact.title}
               </h2>
-              <p className="section-subtitle" style={{ color: "#7f1d1d" }}>
+              <p className="section-subtitle">
                 {deleteImpact.description}
               </p>
             </div>
@@ -403,7 +403,7 @@ export function RecurringPage() {
 
             return editingId === rule.id ? (
               <div key={rule.id} className="entity-card">
-                <div style={{ width: "100%" }}>
+                <div className="full-width">
                   <RecurringRuleEditor
                     values={editValues}
                     error={editError}

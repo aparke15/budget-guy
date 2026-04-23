@@ -160,7 +160,7 @@ export function TransactionsPage() {
       </div>
 
       {showCreateForm ? (
-        <div className="section-card">
+        <div className="section-card section-card--surface">
           <h2 className="section-title">new transaction</h2>
 
           <TransactionForm
@@ -174,7 +174,7 @@ export function TransactionsPage() {
       ) : null}
 
       {editingTransaction ? (
-        <div className="section-card">
+        <div className="section-card section-card--surface">
           <h2 className="section-title">edit transaction</h2>
 
           <TransactionForm
@@ -205,7 +205,7 @@ export function TransactionsPage() {
         </div>
       ) : null}
 
-      <div className="section-card">
+      <div className="section-card section-card--surface">
         <div className="section-header">
           <div className="section-title-group">
             <h2 className="section-title">ledger</h2>
@@ -217,7 +217,7 @@ export function TransactionsPage() {
           </div>
         </div>
 
-        <div className="toolbar" style={{ marginBottom: "1rem" }}>
+        <div className="toolbar toolbar--spaced">
           <label className="field">
             <span className="field__label">account</span>
             <select
@@ -276,7 +276,7 @@ export function TransactionsPage() {
             />
           </label>
 
-          <div className="button-row" style={{ alignItems: "end" }}>
+          <div className="button-row button-row--align-end">
             <button
               type="button"
               onClick={() =>
@@ -308,7 +308,7 @@ export function TransactionsPage() {
                 <th>category</th>
                 <th>account</th>
                 <th>badges</th>
-                <th>amount</th>
+                <th className="money-column">amount</th>
                 <th>note</th>
                 <th>actions</th>
               </tr>
@@ -365,15 +365,13 @@ export function TransactionsPage() {
                     </div>
                   </td>
                   <td
-                    style={{
-                      color:
-                        row.type === "transfer"
-                          ? "#1d4ed8"
-                          : row.amountCents >= 0
-                            ? "#166534"
-                            : "#991b1b",
-                      fontWeight: 600,
-                    }}
+                    className={`money-column ${
+                      row.type === "transfer"
+                        ? "text-info font-semibold"
+                        : row.amountCents >= 0
+                          ? "text-positive font-semibold"
+                          : "text-negative font-semibold"
+                    }`}
                   >
                     {formatCents(
                       row.type === "transfer"
@@ -415,10 +413,7 @@ export function TransactionsPage() {
 
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={8}
-                    style={{ padding: 0 }}
-                  >
+                  <td colSpan={8} className="table-cell--flush">
                     <p className="empty-state">
                       {hasActiveFilters
                         ? "no transactions match the current filters for this month. try clearing filters."

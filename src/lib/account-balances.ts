@@ -10,7 +10,7 @@ export type AccountBalanceRow = {
   accountName: string;
   accountType: Account["type"];
   balanceCents: number;
-  displayLabel: "balance" | "owed";
+  displayLabel: "balance";
   displayValueCents: number;
   creditLimitCents?: number;
   availableCreditCents?: number;
@@ -42,19 +42,17 @@ export function getAccountBalanceCents(
 
 export function getDisplayedAccountBalanceLabel(
   account: Pick<Account, "type">
-): "balance" | "owed" {
-  return account.type === "credit" ? "owed" : "balance";
+): "balance" {
+  void account;
+  return "balance";
 }
 
 export function getDisplayedAccountBalanceCents(
   account: Pick<Account, "type">,
   ledgerBalanceCents: number
 ): number {
-  if (account.type !== "credit") {
-    return ledgerBalanceCents;
-  }
-
-  return Math.max(0, -ledgerBalanceCents);
+  void account;
+  return ledgerBalanceCents;
 }
 
 export function getAvailableCreditCents(
@@ -65,7 +63,7 @@ export function getAvailableCreditCents(
     return undefined;
   }
 
-  return account.creditLimitCents - getDisplayedAccountBalanceCents(account, ledgerBalanceCents);
+  return account.creditLimitCents + Math.min(ledgerBalanceCents, 0);
 }
 
 export function getAllAccountBalances(

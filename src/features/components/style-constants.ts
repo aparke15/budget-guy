@@ -1,9 +1,9 @@
 export const cardStyle = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border-default)",
   borderRadius: "0.875rem",
   padding: "1.1rem",
-  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+  boxShadow: "var(--shadow-card)",
 } as const;
 
 export const inputStyle = {
@@ -12,9 +12,9 @@ export const inputStyle = {
   minHeight: "2.5rem",
   padding: "0.6rem 0.75rem",
   borderRadius: "0.625rem",
-  border: "1px solid #d1d5db",
-  background: "#ffffff",
-  color: "#111827",
+  border: "1px solid var(--border-strong)",
+  background: "var(--bg-card)",
+  color: "var(--text-default)",
 } as const;
 
 export const textAreaStyle = {
@@ -30,9 +30,9 @@ export const primaryButtonStyle = {
   minHeight: "2.5rem",
   padding: "0.65rem 0.95rem",
   borderRadius: "0.625rem",
-  border: "1px solid #111827",
-  background: "#111827",
-  color: "#ffffff",
+  border: "1px solid var(--button-primary-border)",
+  background: "var(--button-primary-bg)",
+  color: "var(--button-primary-text)",
   cursor: "pointer",
   fontWeight: 600,
 } as const;
@@ -44,9 +44,9 @@ export const secondaryButtonStyle = {
   minHeight: "2.5rem",
   padding: "0.65rem 0.95rem",
   borderRadius: "0.625rem",
-  border: "1px solid #d1d5db",
-  background: "#ffffff",
-  color: "#111827",
+  border: "1px solid var(--button-secondary-border)",
+  background: "var(--button-secondary-bg)",
+  color: "var(--button-secondary-text)",
   cursor: "pointer",
   fontWeight: 600,
 } as const;
@@ -58,9 +58,9 @@ export const dangerButtonStyle = {
   minHeight: "2.5rem",
   padding: "0.65rem 0.95rem",
   borderRadius: "0.625rem",
-  border: "1px solid #ef4444",
-  background: "#ffffff",
-  color: "#b91c1c",
+  border: "1px solid var(--button-danger-border)",
+  background: "var(--button-danger-bg)",
+  color: "var(--button-danger-text)",
   cursor: "pointer",
   fontWeight: 600,
 } as const;

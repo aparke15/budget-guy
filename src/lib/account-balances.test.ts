@@ -215,21 +215,22 @@ describe("account balance helpers", () => {
         accountName: "Visa",
         accountType: "credit",
         balanceCents: -20000,
-        displayLabel: "owed",
-        displayValueCents: 20000,
+        displayLabel: "balance",
+        displayValueCents: -20000,
         creditLimitCents: 200000,
         availableCreditCents: 180000,
       },
     ]);
   });
 
-  it("calculates owed and available credit from the same ledger without sign inversion", () => {
+  it("keeps account balance display signed while still deriving available credit", () => {
     const creditAccount = accounts[2]!;
 
-    expect(getDisplayedAccountBalanceLabel(creditAccount)).toBe("owed");
-    expect(getDisplayedAccountBalanceCents(creditAccount, -20000)).toBe(20000);
-    expect(getDisplayedAccountBalanceCents(creditAccount, 5000)).toBe(0);
+    expect(getDisplayedAccountBalanceLabel(creditAccount)).toBe("balance");
+    expect(getDisplayedAccountBalanceCents(creditAccount, -20000)).toBe(-20000);
+    expect(getDisplayedAccountBalanceCents(creditAccount, 5000)).toBe(5000);
     expect(getAvailableCreditCents(creditAccount, -20000)).toBe(180000);
+    expect(getAvailableCreditCents(creditAccount, 5000)).toBe(200000);
   });
 
   it("builds monthly history rows with inflows, outflows, net change, and closing balance", () => {

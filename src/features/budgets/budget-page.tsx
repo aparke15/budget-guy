@@ -5,11 +5,9 @@ import { createBudget } from "../../lib/factories";
 import { getCurrentMonth } from "../../lib/dates";
 import {
   createDraftSummary,
-  getAvailableBudgetCategories,
   getBudgetEditorRows,
   getDraftPlannedTotal,
   getDraftRemainingCents,
-  hasBudgetForMonthCategory,
 } from "./budget-page-helpers";
 import {
   formatCents,
@@ -18,7 +16,6 @@ import {
   parseAmountInputToCents,
 } from "../../lib/money";
 import {
-  compactDangerButtonStyle,
   compactSecondaryButtonStyle,
   inputStyle,
   primaryButtonStyle,
@@ -27,16 +24,12 @@ import {
 export function BudgetPage() {
   const [month, setMonth] = useState(getCurrentMonth());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [newCategoryId, setNewCategoryId] = useState("");
-  const [newPlannedAmount, setNewPlannedAmount] = useState("");
-  const [addError, setAddError] = useState("");
 
   const categories = useAppStore((state) => state.categories);
   const budgets = useAppStore((state) => state.budgets);
   const transactions = useAppStore((state) => state.transactions);
   const addBudget = useAppStore((state) => state.addBudget);
   const updateBudget = useAppStore((state) => state.updateBudget);
-  const deleteBudget = useAppStore((state) => state.deleteBudget);
 
   const expenseCategories = useMemo(
     () => categories.filter((category) => category.kind === "expense"),
@@ -51,11 +44,6 @@ export function BudgetPage() {
   const budgetMap = useMemo(
     () => new Map(rows.map((row) => [row.categoryId, row])),
     [rows]
-  );
-
-  const availableCategories = useMemo(
-    () => getAvailableBudgetCategories(expenseCategories, budgets, month),
-    [budgets, expenseCategories, month]
   );
 
   const summary = useMemo(
@@ -88,16 +76,6 @@ export function BudgetPage() {
     setDrafts(nextDrafts);
   }, [budgetMap, rows]);
 
-  useEffect(() => {
-    setNewCategoryId((current) => {
-      if (availableCategories.some((category) => category.id === current)) {
-        return current;
-      }
-
-      return availableCategories[0]?.id ?? "";
-    });
-  }, [availableCategories]);
-
   function updateDraft(categoryId: string, value: string) {
     setDrafts((current) => ({
       ...current,
@@ -115,12 +93,8 @@ export function BudgetPage() {
   function isDirty(categoryId: string): boolean {
     const existing = budgetMap.get(categoryId);
 
-    if (!existing) {
-      return false;
-    }
-
     const currentCents = getDraftCents(categoryId);
-    const existingCents = existing.plannedCents;
+    const existingCents = existing?.plannedCents ?? 0;
 
     return currentCents !== existingCents;
   }
@@ -128,32 +102,25 @@ export function BudgetPage() {
   function saveCategoryBudget(categoryId: string) {
     const existing = budgetMap.get(categoryId);
 
-    if (!existing) {
-      return;
-    }
-
     const plannedCents = getDraftCents(categoryId);
 
-    if (existing.plannedCents !== plannedCents) {
-      updateBudget(existing.budgetId, { plannedCents });
-    }
-  }
+    if (existing?.budgetId) {
+      if (existing.plannedCents !== plannedCents) {
+        updateBudget(existing.budgetId, { plannedCents });
+      }
 
-  function removeCategoryBudget(categoryId: string) {
-    const existing = budgetMap.get(categoryId);
-
-    if (!existing) {
       return;
     }
 
-    deleteBudget(existing.budgetId);
-
-    setDrafts((current) => {
-      const next = { ...current };
-
-      delete next[categoryId];
-      return next;
-    });
+    if (plannedCents !== 0) {
+      addBudget(
+        createBudget({
+          month,
+          categoryId,
+          plannedCents,
+        })
+      );
+    }
   }
 
   function saveAllBudgets() {
@@ -162,44 +129,13 @@ export function BudgetPage() {
     });
   }
 
-  function handleAddBudget() {
-    setAddError("");
-
-    if (!newCategoryId) {
-      setAddError("choose an expense category");
-      return;
-    }
-
-    if (hasBudgetForMonthCategory(budgets, month, newCategoryId)) {
-      setAddError("budget already exists for this category and month");
-      return;
-    }
-
-    const parsed = parseAmountInputToCents(newPlannedAmount);
-    const plannedCents = parsed ?? 0;
-
-    if (plannedCents < 0) {
-      setAddError("planned amount must be zero or more");
-      return;
-    }
-
-    addBudget(
-      createBudget({
-        month,
-        categoryId: newCategoryId,
-        plannedCents,
-      })
-    );
-    setNewPlannedAmount("");
-  }
-
   return (
     <section className="page">
       <div className="page-header">
         <div className="page-title-group">
           <h1 className="page-title">budgets</h1>
           <p className="page-subtitle">
-            planned vs actual. now with agency.
+            every expense category gets a row. set the plan directly from your category list.
           </p>
         </div>
 
@@ -241,64 +177,24 @@ export function BudgetPage() {
         </div>
       </div>
 
-      <div className="section-card">
-        <div className="toolbar" style={{ marginBottom: "1rem" }}>
-          <label className="field">
-            <span className="field__label">add category</span>
-              <select
-                value={newCategoryId}
-                onChange={(event) => setNewCategoryId(event.target.value)}
-                disabled={availableCategories.length === 0}
-                style={inputStyle}
-              >
-                {availableCategories.length === 0 ? (
-                  <option value="">all expense categories already budgeted</option>
-                ) : null}
-
-                {availableCategories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-          </label>
-
-          <label className="field">
-            <span className="field__label">planned</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={newPlannedAmount}
-                onChange={(event) => setNewPlannedAmount(event.target.value)}
-                style={inputStyle}
-              />
-          </label>
-
-          <button
-            type="button"
-            onClick={handleAddBudget}
-            disabled={availableCategories.length === 0}
-            style={{
-              ...primaryButtonStyle,
-              opacity: availableCategories.length === 0 ? 0.6 : 1,
-              cursor: availableCategories.length === 0 ? "not-allowed" : "pointer",
-            }}
-          >
-            add budget
-          </button>
+      <div className="section-card section-card--surface">
+        <div className="section-header">
+          <div className="section-title-group">
+            <h2 className="section-title">monthly plan by category</h2>
+            <p className="section-subtitle">
+              expense categories come from Settings. categories without a saved plan start at 0.00.
+            </p>
+          </div>
         </div>
-
-        {addError ? <p className="message message--error">{addError}</p> : null}
 
         <div className="table-wrap">
           <table className="app-table">
             <thead>
               <tr>
                 <th>category</th>
-                <th>planned</th>
-                <th>actual</th>
-                <th>remaining</th>
+                <th className="money-column">planned</th>
+                <th className="money-column">actual</th>
+                <th className="money-column">remaining</th>
                 <th>actions</th>
               </tr>
             </thead>
@@ -312,10 +208,10 @@ export function BudgetPage() {
                 const overBudget = remainingCents < 0;
 
                 return (
-                  <tr key={row.budgetId}>
+                  <tr key={row.categoryId}>
                     <td>{row.categoryName}</td>
 
-                    <td>
+                    <td className="money-column">
                       <input
                         type="text"
                         inputMode="decimal"
@@ -328,16 +224,18 @@ export function BudgetPage() {
                           ...inputStyle,
                           width: "120px",
                           minHeight: "2.25rem",
+                          textAlign: "right",
+                          fontVariantNumeric: "tabular-nums",
                           border: dirty
-                            ? "1px solid #2563eb"
-                            : "1px solid #d1d5db",
+                            ? "1px solid var(--color-accent)"
+                            : "1px solid var(--border-strong)",
                         }}
                       />
                     </td>
 
-                    <td>{formatCents(row.actualCents)}</td>
+                    <td className="money-column">{formatCents(row.actualCents)}</td>
 
-                    <td className={overBudget ? "text-negative" : "text-positive"} style={{ fontWeight: 700 }}>
+                    <td className={`money-column ${overBudget ? "text-negative" : "text-positive"} font-bold`}>
                       {formatCents(remainingCents)}
                     </td>
 
@@ -349,21 +247,15 @@ export function BudgetPage() {
                           disabled={!dirty}
                           style={{
                             ...compactSecondaryButtonStyle,
-                            background: dirty ? "#111827" : "#f3f4f6",
-                            color: dirty ? "#ffffff" : "#9ca3af",
-                            borderColor: dirty ? "#111827" : "#d1d5db",
+                            background: dirty ? "var(--button-primary-bg)" : "var(--bg-muted)",
+                            color: dirty ? "var(--button-primary-text)" : "var(--text-muted)",
+                            borderColor: dirty
+                              ? "var(--button-primary-border)"
+                              : "var(--border-strong)",
                             cursor: dirty ? "pointer" : "not-allowed",
                           }}
                         >
                           save
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => removeCategoryBudget(row.categoryId)}
-                          style={compactDangerButtonStyle}
-                        >
-                          remove
                         </button>
                       </div>
                     </td>
@@ -373,12 +265,9 @@ export function BudgetPage() {
 
               {rows.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={5}
-                    style={{ padding: 0 }}
-                  >
+                  <td colSpan={5} className="table-cell--flush">
                     <p className="empty-state">
-                      no budgets for this month yet. add one to get started.
+                      no expense categories yet. add one in settings to start budgeting.
                     </p>
                   </td>
                 </tr>
