@@ -23,5 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
+roadmap.md
+
 # AI tools
 handoff.md
