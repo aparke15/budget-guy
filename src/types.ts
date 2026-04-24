@@ -111,7 +111,9 @@ export type RecurringGenerationRuleSummary = {
 };
 
 export type RecurringGenerationSummary = {
-  month: string;
+  startMonth: string;
+  endMonth: string;
+  monthCount: number;
   createdOccurrences: number;
   createdTransactions: number;
   createdTransfers: number;

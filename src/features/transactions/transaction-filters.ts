@@ -20,6 +20,7 @@ export type TransactionListRow =
       merchant?: string;
       note?: string;
       source: Transaction["source"];
+      recurringRuleId?: string;
       transaction: Transaction;
     }
   | {
@@ -43,7 +44,8 @@ export type TransactionListRow =
       toAccountId: string;
       toAccountName: string;
       note?: string;
-      source: "manual";
+      source: Transaction["source"];
+      recurringRuleId?: string;
       transferGroupId: string;
       transactions: [Transaction, Transaction];
     };
@@ -82,6 +84,7 @@ export function buildTransactionListRows(
           merchant: transaction.merchant,
           note: transaction.note,
           source: transaction.source,
+          recurringRuleId: transaction.recurringRuleId,
           transaction,
         },
       ];
@@ -126,7 +129,8 @@ export function buildTransactionListRows(
         toAccountId: toTransaction.accountId,
         toAccountName: accountMap.get(toTransaction.accountId) ?? "unknown",
         note: fromTransaction.note ?? toTransaction.note,
-        source: "manual",
+        source: fromTransaction.source,
+        recurringRuleId: fromTransaction.recurringRuleId ?? toTransaction.recurringRuleId,
         transferGroupId: transaction.transferGroupId,
         transactions: [fromTransaction, toTransaction],
       },

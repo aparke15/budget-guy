@@ -28,12 +28,13 @@ function Card(props: {
 
 export function DashboardPage() {
   const [month, setMonth] = useState(getCurrentMonth());
+  const [monthCount, setMonthCount] = useState("12");
 
   const transactions = useAppStore((state) => state.transactions);
   const budgets = useAppStore((state) => state.budgets);
   const categories = useAppStore((state) => state.categories);
-  const generateRecurringForMonth = useAppStore(
-    (state) => state.generateRecurringForMonth
+  const generateRecurringForRange = useAppStore(
+    (state) => state.generateRecurringForRange
   );
   const generationSummary = useAppStore(
     (state) => state.lastRecurringGenerationSummary
@@ -53,7 +54,14 @@ export function DashboardPage() {
   const recentTransactions = transactions.slice(0, 8);
 
   function handleGenerateRecurring() {
-    generateRecurringForMonth(month);
+    const parsedMonthCount = Number.parseInt(monthCount, 10);
+
+    generateRecurringForRange(
+      month,
+      Number.isInteger(parsedMonthCount) && parsedMonthCount > 0
+        ? parsedMonthCount
+        : 12
+    );
   }
 
   return (
@@ -77,12 +85,27 @@ export function DashboardPage() {
             />
           </label>
 
+          <label className="field">
+            <span className="field__label">generate months</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={monthCount}
+              onChange={(event) => setMonthCount(event.target.value)}
+              style={{
+                ...inputStyle,
+                width: "8rem",
+              }}
+            />
+          </label>
+
           <button
             type="button"
             onClick={handleGenerateRecurring}
             style={primaryButtonStyle}
           >
-            generate recurring
+            generate recurring range
           </button>
         </div>
       </div>

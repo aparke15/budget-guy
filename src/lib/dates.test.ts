@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   generateOccurrencesForMonth,
   getFirstWeekdayOnOrAfter,
+  getMonthRange,
   getMonthKey,
   getMonthlyOccurrenceDate,
   getYearlyOccurrenceDate,
@@ -31,6 +32,16 @@ function createRule(overrides: Partial<RecurringRule> = {}): RecurringRule {
 describe("dates utilities", () => {
   it("gets a month key from an iso date", () => {
     expect(getMonthKey("2026-04-21")).toBe("2026-04");
+  });
+
+  it("builds a consecutive month range from a start month", () => {
+    expect(getMonthRange("2026-11", 4)).toEqual([
+      "2026-11",
+      "2026-12",
+      "2027-01",
+      "2027-02",
+    ]);
+    expect(getMonthRange("2026-11", 0)).toEqual([]);
   });
 
   it("clamps monthly occurrence dates to the last day of the month", () => {

@@ -1,4 +1,5 @@
 import type { SubmitEvent } from "react";
+
 import { parseAmountInputToCents } from "../../../lib/money";
 import type {
   Account,
@@ -7,7 +8,11 @@ import type {
   RecurringRuleKind,
 } from "../../../types";
 import type { RecurringRuleFormValues } from "../../types";
-import { inputStyle, primaryButtonStyle, secondaryButtonStyle } from "../style-constants";
+import {
+  inputStyle,
+  primaryButtonStyle,
+  secondaryButtonStyle,
+} from "../style-constants";
 
 type RecurringRuleEditorProps = {
   values: RecurringRuleFormValues;
@@ -57,9 +62,18 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
 
   return (
     <form onSubmit={onSubmit} className="stack-sm">
+      <div className="editor-section-marker">
+        <div className="section-title-group">
+          <h3 className="section-title">transaction details</h3>
+          <p className="section-subtitle">
+            define the money movement first, then choose the cadence below.
+          </p>
+        </div>
+      </div>
+
       <div className="form-grid">
         <label className="field">
-          <span className="field__label">rule type</span>
+          <span className="field__label">transaction type</span>
           <select
             value={values.kind}
             onChange={(event) => onKindChange(event.target.value as RecurringRuleKind)}
@@ -71,7 +85,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
         </label>
 
         <label className="field">
-          <span className="field__label">name</span>
+          <span className="field__label">label</span>
           <input
             type="text"
             value={values.name}
@@ -144,6 +158,39 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
           </label>
         )}
 
+        {!isTransferRule ? (
+          <label className="field">
+            <span className="field__label">merchant</span>
+            <input
+              type="text"
+              value={values.merchant}
+              onChange={(event) => onChange("merchant", event.target.value)}
+              style={inputStyle}
+            />
+          </label>
+        ) : null}
+
+        <label className="field">
+          <span className="field__label">note</span>
+          <input
+            type="text"
+            value={values.note}
+            onChange={(event) => onChange("note", event.target.value)}
+            style={inputStyle}
+          />
+        </label>
+      </div>
+
+      <div className="editor-section-marker">
+        <div className="section-title-group">
+          <h3 className="section-title">cadence</h3>
+          <p className="section-subtitle">
+            yearly rules continue to use the start date month and day as the recurring anchor.
+          </p>
+        </div>
+      </div>
+
+      <div className="form-grid">
         <label className="field">
           <span className="field__label">frequency</span>
           <select
@@ -210,28 +257,6 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             </select>
           </label>
         ) : null}
-
-        {!isTransferRule ? (
-          <label className="field">
-            <span className="field__label">merchant</span>
-            <input
-              type="text"
-              value={values.merchant}
-              onChange={(event) => onChange("merchant", event.target.value)}
-              style={inputStyle}
-            />
-          </label>
-        ) : null}
-
-        <label className="field">
-          <span className="field__label">note</span>
-          <input
-            type="text"
-            value={values.note}
-            onChange={(event) => onChange("note", event.target.value)}
-            style={inputStyle}
-          />
-        </label>
       </div>
 
       <label className="checkbox-field">
@@ -253,9 +278,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
         </p>
       )}
 
-      {error ? (
-        <p className="message message--error">{error}</p>
-      ) : null}
+      {error ? <p className="message message--error">{error}</p> : null}
 
       <div className="button-row">
         <button

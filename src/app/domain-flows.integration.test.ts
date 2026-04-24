@@ -475,7 +475,9 @@ describe("domain flow integration", () => {
     const firstSummary = useAppStore.getState().generateRecurringForMonth("2026-04");
 
     expect(firstSummary).toEqual({
-      month: "2026-04",
+      startMonth: "2026-04",
+      endMonth: "2026-04",
+      monthCount: 1,
       createdOccurrences: 2,
       createdTransactions: 3,
       createdTransfers: 1,
@@ -520,7 +522,9 @@ describe("domain flow integration", () => {
     const secondSummary = useAppStore.getState().generateRecurringForMonth("2026-04");
 
     expect(secondSummary).toEqual({
-      month: "2026-04",
+      startMonth: "2026-04",
+      endMonth: "2026-04",
+      monthCount: 1,
       createdOccurrences: 0,
       createdTransactions: 0,
       createdTransfers: 0,

@@ -4,6 +4,14 @@ function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
+function getSummaryRangeLabel(summary: RecurringGenerationSummary): string {
+  if (summary.monthCount === 1) {
+    return summary.startMonth;
+  }
+
+  return `${summary.startMonth} → ${summary.endMonth} · ${pluralize(summary.monthCount, "month")}`;
+}
+
 function buildRecurringGenerationMessage(summary: RecurringGenerationSummary): string {
   const parts = [
     `created ${pluralize(summary.createdTransactions, "transaction")}`,
@@ -37,7 +45,7 @@ export function RecurringGenerationFeedback(props: {
       <div className="section-header">
         <div className="section-title-group">
           <h2 className="section-title">last recurring run</h2>
-          <p className="section-subtitle">{summary.month}</p>
+          <p className="section-subtitle">{getSummaryRangeLabel(summary)}</p>
         </div>
 
         <div className="badge-row">

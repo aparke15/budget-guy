@@ -8,6 +8,7 @@ import {
 } from "../lib/factories";
 import {
   createEmptyRecurringGenerationSummary,
+  generateRecurringTransactionsForRange,
   generateRecurringTransactionsForMonth,
 } from "../lib/recurring-generation";
 import { createSeedState } from "../seed/seed-data";
@@ -81,6 +82,10 @@ type AppState = {
 
   replacePersistedState: (state: PersistedState) => void;
 
+  generateRecurringForRange: (
+    startMonth: string,
+    monthCount: number
+  ) => RecurringGenerationSummary;
   generateRecurringForMonth: (month: string) => RecurringGenerationSummary;
   resetSeedData: () => void;
 };
@@ -528,8 +533,41 @@ export const useAppStore = create<AppState>((set) => ({
       lastRecurringGenerationSummary: null,
     }),
 
+  generateRecurringForRange: (startMonth, monthCount) => {
+    let summary = createEmptyRecurringGenerationSummary(startMonth, monthCount);
+
+    set((state) => {
+      const safeMonthCount =
+        Number.isInteger(monthCount) && monthCount > 0 ? monthCount : 1;
+      const generation = generateRecurringTransactionsForRange(
+        state.recurringRules,
+        state.transactions,
+        startMonth,
+        safeMonthCount
+      );
+
+      summary = generation.summary;
+
+      if (generation.transactions.length === 0) {
+        return {
+          lastRecurringGenerationSummary: generation.summary,
+        };
+      }
+
+      return {
+        transactions: sortTransactions([
+          ...state.transactions,
+          ...generation.transactions,
+        ]),
+        lastRecurringGenerationSummary: generation.summary,
+      };
+    });
+
+    return summary;
+  },
+
   generateRecurringForMonth: (month) => {
-    let summary = createEmptyRecurringGenerationSummary(month);
+    let summary = createEmptyRecurringGenerationSummary(month, 1);
 
     set((state) => {
       const generation = generateRecurringTransactionsForMonth(

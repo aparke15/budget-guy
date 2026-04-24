@@ -9,7 +9,6 @@ const navItems: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/transactions", label: "transactions" },
   { to: "/budgets", label: "budgets" },
   { to: "/accounts", label: "accounts" },
-  { to: "/recurring", label: "recurring" },
   { to: "/forecast", label: "forecast" },
   { to: "/settings", label: "settings" },
 ];

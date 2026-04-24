@@ -139,6 +139,42 @@ textarea {
 	gap: 1.25rem;
 }
 
+.subview-switcher {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.3rem;
+	border: 1px solid var(--border-default);
+	border-radius: 999px;
+	background: var(--bg-card);
+	box-shadow: var(--shadow-card);
+	width: fit-content;
+	max-width: 100%;
+	flex-wrap: wrap;
+}
+
+.subview-switcher__button {
+	border: none;
+	background: transparent;
+	color: var(--text-subtle);
+	min-height: 2.3rem;
+	padding: 0.5rem 0.9rem;
+	border-radius: 999px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: background-color 120ms ease, color 120ms ease;
+}
+
+.subview-switcher__button:hover {
+	background: var(--bg-muted);
+	color: var(--text-default);
+}
+
+.subview-switcher__button--active {
+	background: var(--color-surface-hover);
+	color: var(--text-default);
+}
+
 .page-header,
 .section-header,
 .toolbar {
@@ -557,6 +593,16 @@ textarea {
 .stack-sm {
 	display: grid;
 	gap: 0.75rem;
+}
+
+.editor-section-marker {
+	padding-top: 0.15rem;
+	border-top: 1px solid var(--border-subtle);
+}
+
+.editor-section-marker:first-child {
+	padding-top: 0;
+	border-top: none;
 }
 
 .stack-md {

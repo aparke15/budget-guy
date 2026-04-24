@@ -441,7 +441,9 @@ describe("app store", () => {
     expect(useAppStore.getState().transactions).toHaveLength(2);
     expect(firstSummary).toEqual(useAppStore.getState().lastRecurringGenerationSummary);
     expect(useAppStore.getState().lastRecurringGenerationSummary).toMatchObject({
-      month: "2026-04",
+      startMonth: "2026-04",
+      endMonth: "2026-04",
+      monthCount: 1,
       createdTransactions: 1,
       createdTransfers: 0,
       duplicateOccurrences: 0,
@@ -468,7 +470,9 @@ describe("app store", () => {
     expect(useAppStore.getState().transactions).toHaveLength(2);
     expect(secondSummary).toEqual(useAppStore.getState().lastRecurringGenerationSummary);
     expect(useAppStore.getState().lastRecurringGenerationSummary).toMatchObject({
-      month: "2026-04",
+      startMonth: "2026-04",
+      endMonth: "2026-04",
+      monthCount: 1,
       createdTransactions: 0,
       createdTransfers: 0,
       duplicateOccurrences: 1,
@@ -549,6 +553,74 @@ describe("app store", () => {
 
     const saved = JSON.parse(localStorage.getItem(storagekey) ?? "null") as PersistedState;
     expect(saved.transactions).toHaveLength(2);
+  });
+
+  it("generates recurring transactions across a selected month range", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-1",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      categories: [
+        {
+          id: "cat-1",
+          name: "rent",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-1",
+          kind: "standard",
+          name: "rent",
+          amountCents: -180000,
+          accountId: "acct-1",
+          categoryId: "cat-1",
+          frequency: "monthly",
+          startDate: "2026-01-01",
+          active: true,
+          dayOfMonth: 15,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    const summary = useAppStore.getState().generateRecurringForRange("2026-04", 3);
+
+    expect(useAppStore.getState().transactions.map((item) => item.date)).toEqual([
+      "2026-06-15",
+      "2026-05-15",
+      "2026-04-15",
+    ]);
+    expect(summary).toEqual({
+      startMonth: "2026-04",
+      endMonth: "2026-06",
+      monthCount: 3,
+      createdOccurrences: 3,
+      createdTransactions: 3,
+      createdTransfers: 0,
+      duplicateOccurrences: 0,
+      ruleResults: [
+        {
+          recurringRuleId: "rule-1",
+          ruleName: "rent",
+          kind: "standard",
+          createdOccurrences: 3,
+          createdTransactions: 3,
+          createdTransfers: 0,
+          duplicateOccurrences: 0,
+        },
+      ],
+    });
   });
 
   it("generates yearly standard recurring transactions only for the matching month", async () => {

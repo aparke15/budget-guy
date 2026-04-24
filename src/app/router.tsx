@@ -9,7 +9,7 @@ import { RecurringPage } from "../features/recurring/recurring-page";
 import { SettingsPage } from "../features/settings/settings-page";
 import { TransactionsPage } from "../features/transactions/transactions-page";
 
-export const router = createBrowserRouter([
+export const appRoutes = [
   {
     path: "/",
     element: <App />,
@@ -48,4 +48,6 @@ export const router = createBrowserRouter([
       },
     ],
   },
-]);
+];
+
+export const router = createBrowserRouter(appRoutes);

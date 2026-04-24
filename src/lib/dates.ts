@@ -1,5 +1,6 @@
 import {
   addDays,
+  addMonths,
   differenceInCalendarDays,
   eachDayOfInterval,
   endOfMonth,
@@ -42,6 +43,22 @@ export function getMonthKey(date: string): string {
 
 export function getCurrentMonth(): string {
   return format(new Date(), "yyyy-MM");
+}
+
+export function getMonthRange(startMonth: string, monthCount: number): string[] {
+  if (monthCount <= 0 || !Number.isInteger(monthCount)) {
+    return [];
+  }
+
+  const start = parseISO(`${startMonth}-01`);
+
+  if (!isValid(start)) {
+    return [];
+  }
+
+  return Array.from({ length: monthCount }, (_, index) =>
+    format(addMonths(start, index), "yyyy-MM")
+  );
 }
 
 export function getNowIso(): string {
