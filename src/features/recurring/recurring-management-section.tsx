@@ -32,20 +32,11 @@ import {
 } from "./recurring-helpers";
 import { RecurringGenerationFeedback } from "./recurring-generation-feedback";
 
-type RecurringManagementSectionProps = {
-  requestedEditingRuleId?: string | null;
-  onRequestedEditingRuleHandled?: () => void;
-};
-
 function getRuleKindBadgeClass(kind: RecurringRuleFormValues["kind"] | "standard" | "transfer") {
   return kind === "transfer" ? "badge badge--transfer" : "badge badge--recurring";
 }
 
-export function RecurringManagementSection(
-  props: RecurringManagementSectionProps
-) {
-  const { requestedEditingRuleId, onRequestedEditingRuleHandled } = props;
-
+export function RecurringManagementSection() {
   const accounts = useAppStore((state) => state.accounts);
   const categories = useAppStore((state) => state.categories);
   const transactions = useAppStore((state) => state.transactions);
@@ -152,15 +143,6 @@ export function RecurringManagementSection(
     setEditValues(createRecurringRuleFormValues(sortedAccounts, sortedCategories, rule));
     setEditError("");
   }
-
-  useEffect(() => {
-    if (!requestedEditingRuleId) {
-      return;
-    }
-
-    startEditing(requestedEditingRuleId);
-    onRequestedEditingRuleHandled?.();
-  }, [requestedEditingRuleId, onRequestedEditingRuleHandled, recurringRules, sortedAccounts, sortedCategories]);
 
   function handleCreateSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -284,20 +266,17 @@ export function RecurringManagementSection(
           </div>
 
           <div className="page-actions">
-            <label className="field">
+            <label className="field field--medium">
               <span className="field__label">start month</span>
               <input
                 type="month"
                 value={startMonth}
                 onChange={(event) => setStartMonth(event.target.value)}
-                style={{
-                  ...inputStyle,
-                  width: "11rem",
-                }}
+                style={inputStyle}
               />
             </label>
 
-            <label className="field">
+            <label className="field field--compact">
               <span className="field__label">months</span>
               <input
                 type="number"
@@ -305,10 +284,7 @@ export function RecurringManagementSection(
                 step="1"
                 value={monthCount}
                 onChange={(event) => setMonthCount(event.target.value)}
-                style={{
-                  ...inputStyle,
-                  width: "8rem",
-                }}
+                style={inputStyle}
               />
             </label>
 

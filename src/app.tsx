@@ -37,37 +37,34 @@ export default function App() {
             </div>
           </div>
 
-          <div className="app-header__actions">
-            <nav className="app-nav">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    isActive
-                      ? "app-nav__link app-nav__link--active"
-                      : "app-nav__link"
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={handleThemeToggle}
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            aria-pressed={theme === "dark"}
+          >
+            <span className="theme-toggle__icon" aria-hidden="true">
+              {theme === "dark" ? "☀" : "☾"}
+            </span>
+          </button>
 
-            <button
-              type="button"
-              className="theme-toggle"
-              onClick={handleThemeToggle}
-              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-              aria-pressed={theme === "dark"}
-            >
-              <span className="theme-toggle__icon" aria-hidden="true">
-                {theme === "dark" ? "☀" : "☾"}
-              </span>
-              <span>{theme === "dark" ? "light mode" : "dark mode"}</span>
-            </button>
-          </div>
+          <nav className="app-nav">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  isActive
+                    ? "app-nav__link app-nav__link--active"
+                    : "app-nav__link"
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
         </div>
       </header>
 

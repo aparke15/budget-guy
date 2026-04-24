@@ -24,6 +24,7 @@ import {
 export function BudgetPage() {
   const [month, setMonth] = useState(getCurrentMonth());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [expandedBudgetCategoryId, setExpandedBudgetCategoryId] = useState<string | null>(null);
 
   const categories = useAppStore((state) => state.categories);
   const budgets = useAppStore((state) => state.budgets);
@@ -77,6 +78,7 @@ export function BudgetPage() {
   }, [budgetMap, rows]);
 
   function updateDraft(categoryId: string, value: string) {
+    setExpandedBudgetCategoryId(categoryId);
     setDrafts((current) => ({
       ...current,
       [categoryId]: value,
@@ -126,6 +128,16 @@ export function BudgetPage() {
   function saveAllBudgets() {
     rows.forEach((row) => {
       saveCategoryBudget(row.categoryId);
+    });
+  }
+
+  function toggleExpandedBudgetRow(categoryId: string, forceExpanded = false) {
+    setExpandedBudgetCategoryId((current) => {
+      if (forceExpanded) {
+        return categoryId;
+      }
+
+      return current === categoryId ? null : categoryId;
     });
   }
 
@@ -187,7 +199,7 @@ export function BudgetPage() {
           </div>
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap responsive-table-desktop">
           <table className="app-table">
             <thead>
               <tr>
@@ -213,6 +225,7 @@ export function BudgetPage() {
 
                     <td className="money-column">
                       <input
+                        className="money-input budget-planned-input"
                         type="text"
                         inputMode="decimal"
                         placeholder="0.00"
@@ -222,10 +235,7 @@ export function BudgetPage() {
                         }
                         style={{
                           ...inputStyle,
-                          width: "120px",
                           minHeight: "2.25rem",
-                          textAlign: "right",
-                          fontVariantNumeric: "tabular-nums",
                           border: dirty
                             ? "1px solid var(--color-accent)"
                             : "1px solid var(--border-strong)",
@@ -274,6 +284,117 @@ export function BudgetPage() {
               ) : null}
             </tbody>
           </table>
+        </div>
+
+        <div className="responsive-table-mobile table-card-list" aria-label="budget rows list">
+          {rows.length === 0 ? (
+            <p className="empty-state">
+              no expense categories yet. add one in settings to start budgeting.
+            </p>
+          ) : (
+            rows.map((row) => {
+              const dirty = isDirty(row.categoryId);
+              const remainingCents = getDraftRemainingCents(
+                getDraftCents(row.categoryId),
+                row.actualCents
+              );
+              const overBudget = remainingCents < 0;
+              const isExpanded = expandedBudgetCategoryId === row.categoryId || dirty;
+
+              return (
+                <article
+                  key={row.categoryId}
+                  className={isExpanded ? "table-card table-card--expanded" : "table-card"}
+                >
+                  <button
+                    type="button"
+                    className="table-card__summary"
+                    aria-expanded={isExpanded}
+                    onClick={() => {
+                      if (dirty) {
+                        toggleExpandedBudgetRow(row.categoryId, true);
+                        return;
+                      }
+
+                      toggleExpandedBudgetRow(row.categoryId);
+                    }}
+                  >
+                    <div className="table-card__top">
+                      <div className="table-card__details-group">
+                        <div className="table-card__details">{row.categoryName}</div>
+                      </div>
+
+                      <div className="table-card__amount font-bold">
+                        {formatCents(row.actualCents)} / {formatCents(getDraftCents(row.categoryId))}
+                      </div>
+                    </div>
+
+                    <div className="table-card__summary-footer">
+                      <div className="table-card__summary-meta">
+                        <span>spent / planned</span>
+                      </div>
+
+                      <span className="table-card__chevron" aria-hidden="true">
+                        {isExpanded ? "▴" : "▾"}
+                      </span>
+                    </div>
+                  </button>
+
+                  {isExpanded ? (
+                    <div className="table-card__expanded-details">
+                      <label className="field">
+                        <span className="field__label">planned</span>
+                        <input
+                          className="money-input"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={drafts[row.categoryId] ?? ""}
+                          onFocus={() => toggleExpandedBudgetRow(row.categoryId, true)}
+                          onChange={(event) =>
+                            updateDraft(row.categoryId, event.target.value)
+                          }
+                          style={{
+                            ...inputStyle,
+                            minHeight: "2.25rem",
+                            border: dirty
+                              ? "1px solid var(--color-accent)"
+                              : "1px solid var(--border-strong)",
+                          }}
+                        />
+                      </label>
+
+                      <div className="table-card__meta-line">
+                        <span className="table-card__eyebrow">remaining</span>
+                        <span className={overBudget ? "text-negative font-bold" : "text-positive font-bold"}>
+                          {formatCents(remainingCents)}
+                        </span>
+                      </div>
+
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          onClick={() => saveCategoryBudget(row.categoryId)}
+                          disabled={!dirty}
+                          style={{
+                            ...compactSecondaryButtonStyle,
+                            background: dirty ? "var(--button-primary-bg)" : "var(--bg-muted)",
+                            color: dirty ? "var(--button-primary-text)" : "var(--text-muted)",
+                            borderColor: dirty
+                              ? "var(--button-primary-border)"
+                              : "var(--border-strong)",
+                            cursor: dirty ? "pointer" : "not-allowed",
+                          }}
+                        >
+                          save
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })
+          )}
         </div>
       </div>
     </section>

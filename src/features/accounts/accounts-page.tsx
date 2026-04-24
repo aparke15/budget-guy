@@ -71,6 +71,8 @@ export function AccountsPage() {
     createAccountFormValues()
   );
   const [editError, setEditError] = useState("");
+  const [expandedBalanceAccountId, setExpandedBalanceAccountId] = useState<string | null>(null);
+  const [expandedHistoryMonth, setExpandedHistoryMonth] = useState<string | null>(null);
 
   const sortedAccounts = useMemo(() => sortItemsByName(accounts), [accounts]);
 
@@ -344,6 +346,15 @@ export function AccountsPage() {
     }
   }
 
+  function toggleExpandedBalanceAccount(accountId: string) {
+    setSelectedAccountId(accountId);
+    setExpandedBalanceAccountId((current) => (current === accountId ? null : accountId));
+  }
+
+  function toggleExpandedHistoryRow(month: string) {
+    setExpandedHistoryMonth((current) => (current === month ? null : month));
+  }
+
   return (
     <section className="page">
       <div className="page-header">
@@ -400,60 +411,144 @@ export function AccountsPage() {
             no accounts yet. create one below to start tracking balances.
           </p>
         ) : (
-          <div className="table-wrap">
-            <table className="app-table">
-              <thead>
-                <tr>
-                  <th>account</th>
-                  <th>type</th>
-                  <th className="money-column">balance</th>
-                  <th className="money-column">limit</th>
-                  <th className="money-column">available credit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {balanceRows.map((row) => {
-                  const isSelected = row.accountId === selectedAccountId;
-                  const valueClass =
-                    row.displayValueCents > 0
-                      ? "text-positive"
-                      : row.displayValueCents < 0
-                        ? "text-negative"
-                        : "";
+          <>
+            <div className="table-wrap responsive-table-desktop">
+              <table className="app-table">
+                <thead>
+                  <tr>
+                    <th>account</th>
+                    <th>type</th>
+                    <th className="money-column">balance</th>
+                    <th className="money-column">limit</th>
+                    <th className="money-column">available credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {balanceRows.map((row) => {
+                    const isSelected = row.accountId === selectedAccountId;
+                    const valueClass =
+                      row.displayValueCents > 0
+                        ? "text-positive"
+                        : row.displayValueCents < 0
+                          ? "text-negative"
+                          : "";
 
-                  return (
-                    <tr
-                      key={row.accountId}
-                      onClick={() => setSelectedAccountId(row.accountId)}
-                      className={isSelected ? "table-row--selected row-clickable" : "row-clickable"}
+                    return (
+                      <tr
+                        key={row.accountId}
+                        onClick={() => setSelectedAccountId(row.accountId)}
+                        className={isSelected ? "table-row--selected row-clickable" : "row-clickable"}
+                      >
+                        <td className={isSelected ? "font-bold" : "font-semibold"}>
+                          {row.accountName}
+                        </td>
+                        <td>
+                          <span className={getAccountTypeBadgeClass(row.accountType)}>
+                            {row.accountType}
+                          </span>
+                        </td>
+                        <td className={`money-column ${valueClass} font-bold`}>
+                          {formatCents(row.displayValueCents)}
+                        </td>
+                        <td className="money-column">
+                          {row.creditLimitCents != null
+                            ? formatCents(row.creditLimitCents)
+                            : "—"}
+                        </td>
+                        <td className="money-column">
+                          {row.availableCreditCents != null
+                            ? formatCents(row.availableCreditCents)
+                            : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="responsive-table-mobile table-card-list" aria-label="account balances list">
+              {balanceRows.map((row) => {
+                const isSelected = row.accountId === selectedAccountId;
+                const isExpanded = expandedBalanceAccountId === row.accountId;
+                const valueClass =
+                  row.displayValueCents > 0
+                    ? "text-positive"
+                    : row.displayValueCents < 0
+                      ? "text-negative"
+                      : "";
+
+                return (
+                  <article
+                    key={row.accountId}
+                    className={
+                      isSelected
+                        ? isExpanded
+                          ? "table-card table-card--selected table-card--expanded"
+                          : "table-card table-card--selected"
+                        : isExpanded
+                          ? "table-card table-card--expanded"
+                          : "table-card"
+                    }
+                  >
+                    <button
+                      type="button"
+                      className="table-card__summary"
+                      aria-expanded={isExpanded}
+                      onClick={() => toggleExpandedBalanceAccount(row.accountId)}
                     >
-                      <td className={isSelected ? "font-bold" : "font-semibold"}>
-                        {row.accountName}
-                      </td>
-                      <td>
-                        <span className={getAccountTypeBadgeClass(row.accountType)}>
-                          {row.accountType}
+                      <div className="table-card__top">
+                        <div className="table-card__details-group">
+                          <div className="table-card__details">{row.accountName}</div>
+                        </div>
+
+                        <div className={`table-card__amount ${valueClass} font-bold`}>
+                          {formatCents(row.displayValueCents)}
+                        </div>
+                      </div>
+
+                      <div className="table-card__summary-footer">
+                        <div className="table-card__summary-meta">
+                          <span>{row.displayLabel}</span>
+                        </div>
+
+                        <span className="table-card__chevron" aria-hidden="true">
+                          {isExpanded ? "▴" : "▾"}
                         </span>
-                      </td>
-                      <td className={`money-column ${valueClass} font-bold`}>
-                        {formatCents(row.displayValueCents)}
-                      </td>
-                      <td className="money-column">
-                        {row.creditLimitCents != null
-                          ? formatCents(row.creditLimitCents)
-                          : "—"}
-                      </td>
-                      <td className="money-column">
-                        {row.availableCreditCents != null
-                          ? formatCents(row.availableCreditCents)
-                          : "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </button>
+
+                    {isExpanded ? (
+                      <div className="table-card__expanded-details">
+                        <div className="badge-row">
+                          <span className={getAccountTypeBadgeClass(row.accountType)}>
+                            {row.accountType}
+                          </span>
+                          {isSelected ? <span className="badge badge--neutral">selected</span> : null}
+                        </div>
+
+                        <div className="table-card__meta-line">
+                          <span className="table-card__eyebrow">credit limit</span>
+                          <span>
+                            {row.creditLimitCents != null
+                              ? formatCents(row.creditLimitCents)
+                              : "—"}
+                          </span>
+                        </div>
+
+                        {row.availableCreditCents != null ? (
+                          <div className="table-card__meta-line">
+                            <span className="table-card__eyebrow">available credit</span>
+                            <span>{formatCents(row.availableCreditCents)}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
@@ -642,53 +737,131 @@ export function AccountsPage() {
         ) : historyRows.length === 0 ? (
           <p className="empty-state">no transactions for this account yet.</p>
         ) : (
-          <div className="table-wrap">
-            <table className="app-table">
-              <thead>
-                <tr>
-                  <th>month</th>
-                  <th className="money-column">inflows</th>
-                  <th className="money-column">outflows</th>
-                  <th className="money-column">net change</th>
-                  <th className="money-column">closing balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historyRows.map((row) => {
-                  const closingValueCents = getDisplayedAccountBalanceCents(
-                    selectedAccount,
-                    row.closingBalanceCents
-                  );
-                  const closingClass =
-                    closingValueCents > 0
-                      ? "text-positive"
-                      : closingValueCents < 0
-                        ? "text-negative"
-                        : "";
+          <>
+            <div className="table-wrap responsive-table-desktop">
+              <table className="app-table">
+                <thead>
+                  <tr>
+                    <th>month</th>
+                    <th className="money-column">inflows</th>
+                    <th className="money-column">outflows</th>
+                    <th className="money-column">net change</th>
+                    <th className="money-column">closing balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyRows.map((row) => {
+                    const closingValueCents = getDisplayedAccountBalanceCents(
+                      selectedAccount,
+                      row.closingBalanceCents
+                    );
+                    const closingClass =
+                      closingValueCents > 0
+                        ? "text-positive"
+                        : closingValueCents < 0
+                          ? "text-negative"
+                          : "";
 
-                  return (
-                    <tr key={row.month}>
-                      <td>{row.month}</td>
-                      <td className="money-column text-positive font-bold">
-                        {formatCents(row.inflowsCents)}
-                      </td>
-                      <td className="money-column text-negative font-bold">
-                        {formatCents(row.outflowsCents)}
-                      </td>
-                      <td
-                        className={`money-column ${row.netChangeCents >= 0 ? "text-positive" : "text-negative"} font-bold`}
-                      >
-                        {formatCents(row.netChangeCents)}
-                      </td>
-                      <td className={`money-column ${closingClass} font-bold`}>
-                        {formatCents(closingValueCents)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    return (
+                      <tr key={row.month}>
+                        <td>{row.month}</td>
+                        <td className="money-column text-positive font-bold">
+                          {formatCents(row.inflowsCents)}
+                        </td>
+                        <td className="money-column text-negative font-bold">
+                          {formatCents(row.outflowsCents)}
+                        </td>
+                        <td
+                          className={`money-column ${row.netChangeCents >= 0 ? "text-positive" : "text-negative"} font-bold`}
+                        >
+                          {formatCents(row.netChangeCents)}
+                        </td>
+                        <td className={`money-column ${closingClass} font-bold`}>
+                          {formatCents(closingValueCents)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div
+              className="responsive-table-mobile table-card-list"
+              aria-label={`${selectedAccount.name} history list`}
+            >
+              {historyRows.map((row) => {
+                const closingValueCents = getDisplayedAccountBalanceCents(
+                  selectedAccount,
+                  row.closingBalanceCents
+                );
+                const isExpanded = expandedHistoryMonth === row.month;
+                const closingClass =
+                  closingValueCents > 0
+                    ? "text-positive"
+                    : closingValueCents < 0
+                      ? "text-negative"
+                      : "";
+
+                return (
+                  <article
+                    key={row.month}
+                    className={
+                      isExpanded ? "table-card table-card--expanded" : "table-card"
+                    }
+                  >
+                    <button
+                      type="button"
+                      className="table-card__summary"
+                      aria-expanded={isExpanded}
+                      onClick={() => toggleExpandedHistoryRow(row.month)}
+                    >
+                      <div className="table-card__top">
+                        <div className="table-card__details-group">
+                          <div className="table-card__details">{row.month}</div>
+                        </div>
+
+                        <div className={`table-card__amount ${closingClass} font-bold`}>
+                          {formatCents(closingValueCents)}
+                        </div>
+                      </div>
+
+                      <div className="table-card__summary-footer">
+                        <div className="table-card__summary-meta">
+                          <span>closing balance</span>
+                        </div>
+
+                        <span className="table-card__chevron" aria-hidden="true">
+                          {isExpanded ? "▴" : "▾"}
+                        </span>
+                      </div>
+                    </button>
+
+                    {isExpanded ? (
+                      <div className="table-card__expanded-details">
+                        <div className="table-card__meta-line">
+                          <span className="table-card__eyebrow">inflows</span>
+                          <span className="text-positive font-bold">{formatCents(row.inflowsCents)}</span>
+                        </div>
+
+                        <div className="table-card__meta-line">
+                          <span className="table-card__eyebrow">outflows</span>
+                          <span className="text-negative font-bold">{formatCents(row.outflowsCents)}</span>
+                        </div>
+
+                        <div className="table-card__meta-line">
+                          <span className="table-card__eyebrow">net change</span>
+                          <span className={row.netChangeCents >= 0 ? "text-positive font-bold" : "text-negative font-bold"}>
+                            {formatCents(row.netChangeCents)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </section>

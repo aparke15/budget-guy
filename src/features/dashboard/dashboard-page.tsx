@@ -29,10 +29,12 @@ function Card(props: {
 export function DashboardPage() {
   const [month, setMonth] = useState(getCurrentMonth());
   const [monthCount, setMonthCount] = useState("12");
+  const [expandedRecentTransactionId, setExpandedRecentTransactionId] = useState<string | null>(null);
 
   const transactions = useAppStore((state) => state.transactions);
   const budgets = useAppStore((state) => state.budgets);
   const categories = useAppStore((state) => state.categories);
+  const accounts = useAppStore((state) => state.accounts);
   const generateRecurringForRange = useAppStore(
     (state) => state.generateRecurringForRange
   );
@@ -52,6 +54,99 @@ export function DashboardPage() {
 
   const overBudget = budgetRows.filter((row) => row.overBudget);
   const recentTransactions = transactions.slice(0, 8);
+  const categoryMap = useMemo(
+    () => new Map(categories.map((category) => [category.id, category.name])),
+    [categories]
+  );
+  const accountMap = useMemo(
+    () => new Map(accounts.map((account) => [account.id, account.name])),
+    [accounts]
+  );
+
+  function toggleExpandedRecentTransaction(transactionId: string) {
+    setExpandedRecentTransactionId((current) =>
+      current === transactionId ? null : transactionId
+    );
+  }
+
+  function getRecentTransactionDetails(transaction: (typeof recentTransactions)[number]) {
+    return transaction.kind === "opening-balance"
+      ? "opening balance"
+      : transaction.kind === "transfer"
+        ? transaction.merchant ?? "transfer"
+        : transaction.merchant ?? "—";
+  }
+
+  function getRecentTransactionCategoryLabel(
+    transaction: (typeof recentTransactions)[number]
+  ) {
+    if (transaction.kind === "transfer") {
+      return "transfer";
+    }
+
+    if (transaction.kind === "opening-balance") {
+      return "opening balance";
+    }
+
+    return transaction.categoryId
+      ? categoryMap.get(transaction.categoryId) ?? "unknown"
+      : "—";
+  }
+
+  function getRecentTransactionAccountLabel(
+    transaction: (typeof recentTransactions)[number]
+  ) {
+    return accountMap.get(transaction.accountId) ?? "unknown account";
+  }
+
+  function getRecentTransactionAmountClass(
+    transaction: (typeof recentTransactions)[number]
+  ) {
+    if (transaction.kind === "transfer") {
+      return "text-info font-bold";
+    }
+
+    return transaction.amountCents >= 0
+      ? "text-positive font-bold"
+      : "text-negative font-bold";
+  }
+
+  function renderRecentTransactionBadges(
+    transaction: (typeof recentTransactions)[number]
+  ) {
+    return (
+      <div className="badge-row">
+        <span
+          className={
+            transaction.kind === "transfer"
+              ? "badge badge--transfer"
+              : transaction.kind === "opening-balance"
+                ? "badge badge--opening"
+                : transaction.amountCents >= 0
+                  ? "badge badge--income"
+                  : "badge badge--expense"
+          }
+        >
+          {transaction.kind === "transfer"
+            ? "transfer"
+            : transaction.kind === "opening-balance"
+              ? "opening balance"
+              : transaction.amountCents >= 0
+                ? "income"
+                : "expense"}
+        </span>
+        <span
+          className={
+            transaction.source === "recurring"
+              ? "badge badge--recurring"
+              : "badge badge--neutral"
+          }
+        >
+          {transaction.source}
+        </span>
+      </div>
+    );
+  }
 
   function handleGenerateRecurring() {
     const parsedMonthCount = Number.parseInt(monthCount, 10);
@@ -85,7 +180,7 @@ export function DashboardPage() {
             />
           </label>
 
-          <label className="field">
+          <label className="field field--compact">
             <span className="field__label">generate months</span>
             <input
               type="number"
@@ -93,10 +188,7 @@ export function DashboardPage() {
               step="1"
               value={monthCount}
               onChange={(event) => setMonthCount(event.target.value)}
-              style={{
-                ...inputStyle,
-                width: "8rem",
-              }}
+              style={inputStyle}
             />
           </label>
 
@@ -173,7 +265,7 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap responsive-table-desktop">
           <table className="app-table">
             <thead>
               <tr>
@@ -194,54 +286,9 @@ export function DashboardPage() {
                 recentTransactions.map((transaction) => (
                   <tr key={transaction.id}>
                     <td>{transaction.date}</td>
-                    <td>
-                      {transaction.kind === "opening-balance"
-                        ? "opening balance"
-                        : transaction.kind === "transfer"
-                          ? "transfer"
-                          : transaction.merchant ?? "—"}
-                    </td>
-                    <td>
-                      <div className="badge-row">
-                        <span
-                          className={
-                            transaction.kind === "transfer"
-                              ? "badge badge--transfer"
-                              : transaction.kind === "opening-balance"
-                                ? "badge badge--opening"
-                                : transaction.amountCents >= 0
-                                  ? "badge badge--income"
-                                  : "badge badge--expense"
-                          }
-                        >
-                          {transaction.kind === "transfer"
-                            ? "transfer"
-                            : transaction.kind === "opening-balance"
-                              ? "opening balance"
-                              : transaction.amountCents >= 0
-                                ? "income"
-                                : "expense"}
-                        </span>
-                        <span
-                          className={
-                            transaction.source === "recurring"
-                              ? "badge badge--recurring"
-                              : "badge badge--neutral"
-                          }
-                        >
-                          {transaction.source}
-                        </span>
-                      </div>
-                    </td>
-                    <td
-                      className={`money-column ${
-                        transaction.kind === "transfer"
-                          ? "text-info font-bold"
-                          : transaction.amountCents >= 0
-                            ? "text-positive font-bold"
-                            : "text-negative font-bold"
-                      }`}
-                    >
+                    <td>{getRecentTransactionDetails(transaction)}</td>
+                    <td>{renderRecentTransactionBadges(transaction)}</td>
+                    <td className={`money-column ${getRecentTransactionAmountClass(transaction)}`}>
                       {formatCents(transaction.amountCents)}
                     </td>
                   </tr>
@@ -249,6 +296,76 @@ export function DashboardPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="responsive-table-mobile table-card-list" aria-label="recent transactions list">
+          {recentTransactions.length === 0 ? (
+            <p className="empty-state">no transactions yet.</p>
+          ) : (
+            recentTransactions.map((transaction) => {
+              const isExpanded = expandedRecentTransactionId === transaction.id;
+
+              return (
+                <article
+                  key={transaction.id}
+                  className={
+                    transaction.kind === "opening-balance"
+                      ? isExpanded
+                        ? "table-card table-card--opening table-card--expanded"
+                        : "table-card table-card--opening"
+                      : isExpanded
+                        ? "table-card table-card--expanded"
+                        : "table-card"
+                  }
+                >
+                  <button
+                    type="button"
+                    className="table-card__summary"
+                    aria-expanded={isExpanded}
+                    onClick={() => toggleExpandedRecentTransaction(transaction.id)}
+                  >
+                    <div className="table-card__top">
+                      <div className="table-card__details-group">
+                        <div className="table-card__details">
+                          {getRecentTransactionDetails(transaction)}
+                        </div>
+                      </div>
+
+                      <div className={`table-card__amount ${getRecentTransactionAmountClass(transaction)}`}>
+                        {formatCents(transaction.amountCents)}
+                      </div>
+                    </div>
+
+                    <div className="table-card__summary-footer">
+                      <div className="table-card__summary-meta">
+                        <span className="table-card__date">{transaction.date}</span>
+                      </div>
+
+                      <span className="table-card__chevron" aria-hidden="true">
+                        {isExpanded ? "▴" : "▾"}
+                      </span>
+                    </div>
+                  </button>
+
+                  {isExpanded ? (
+                    <div className="table-card__expanded-details">
+                      <div className="table-card__meta-line">
+                        <span className="table-card__eyebrow">category</span>
+                        <span>{getRecentTransactionCategoryLabel(transaction)}</span>
+                      </div>
+
+                      <div className="table-card__meta-line">
+                        <span className="table-card__eyebrow">account</span>
+                        <span>{getRecentTransactionAccountLabel(transaction)}</span>
+                      </div>
+
+                      {renderRecentTransactionBadges(transaction)}
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })
+          )}
         </div>
       </div>
     </section>

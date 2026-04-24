@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { useAppStore } from "../../app/store";
@@ -28,6 +28,75 @@ function getTransactionsTab(value: string | null): TransactionsTab {
   return value === "recurring" ? "recurring" : "activity";
 }
 
+function getTransactionDetails(row: TransactionListRow) {
+  if (row.type === "transfer") {
+    return `${row.fromAccountName} → ${row.toAccountName}`;
+  }
+
+  if (row.type === "opening-balance") {
+    return "opening balance";
+  }
+
+  return row.merchant ?? "—";
+}
+
+function getTransactionCategoryLabel(
+  row: TransactionListRow,
+  categoryMap: Map<string, string>
+) {
+  if (row.type === "transfer") {
+    return "transfer";
+  }
+
+  if (row.type === "opening-balance") {
+    return "opening balance";
+  }
+
+  return categoryMap.get(row.categoryId) ?? "unknown";
+}
+
+function getTransactionAccountLabel(row: TransactionListRow) {
+  if (row.type === "transfer") {
+    return `${row.fromAccountName} → ${row.toAccountName}`;
+  }
+
+  return row.accountName;
+}
+
+function getTransactionAmountClass(row: TransactionListRow) {
+  if (row.type === "transfer") {
+    return "text-info font-semibold";
+  }
+
+  return row.amountCents >= 0
+    ? "text-positive font-semibold"
+    : "text-negative font-semibold";
+}
+
+function getTransactionTypeBadgeClass(row: TransactionListRow) {
+  if (row.type === "transfer") {
+    return "badge badge--transfer";
+  }
+
+  if (row.type === "opening-balance") {
+    return "badge badge--opening";
+  }
+
+  return row.amountCents >= 0 ? "badge badge--income" : "badge badge--expense";
+}
+
+function getTransactionTypeBadgeLabel(row: TransactionListRow) {
+  if (row.type === "transfer") {
+    return "transfer";
+  }
+
+  if (row.type === "opening-balance") {
+    return "opening balance";
+  }
+
+  return row.amountCents >= 0 ? "income" : "expense";
+}
+
 export function TransactionsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState<TransactionFilters>({
@@ -38,9 +107,10 @@ export function TransactionsPage() {
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null);
+  const editSectionRef = useRef<HTMLDivElement | null>(null);
 
   const activeTab = getTransactionsTab(searchParams.get("tab"));
-  const requestedRecurringRuleId = searchParams.get("rule");
 
   const transactions = useAppStore((state) => state.transactions);
   const categories = useAppStore((state) => state.categories);
@@ -78,16 +148,25 @@ export function TransactionsPage() {
     [editingId, transactionRows]
   );
 
-  function updateSearchParams(nextTab: TransactionsTab, nextRuleId?: string | null) {
+  useEffect(() => {
+    if (!editingTransaction || !editSectionRef.current) {
+      return;
+    }
+
+    const top =
+      editSectionRef.current.getBoundingClientRect().top + window.scrollY - 96;
+
+    window.scrollTo({
+      top: Math.max(0, top),
+      behavior: "smooth",
+    });
+  }, [editingTransaction]);
+
+  function updateSearchParams(nextTab: TransactionsTab) {
     const nextParams = new URLSearchParams(searchParams);
 
     nextParams.set("tab", nextTab);
-
-    if (nextRuleId) {
-      nextParams.set("rule", nextRuleId);
-    } else {
-      nextParams.delete("rule");
-    }
+    nextParams.delete("rule");
 
     setSearchParams(nextParams, { replace: true });
   }
@@ -144,6 +223,65 @@ export function TransactionsPage() {
     if (editingId === row.id) {
       setEditingId(null);
     }
+  }
+
+  function toggleExpandedTransaction(rowId: string) {
+    setExpandedTransactionId((current) => (current === rowId ? null : rowId));
+  }
+
+  function startEditingTransaction(rowId: string) {
+    setEditingId(rowId);
+    setShowCreateForm(false);
+    setExpandedTransactionId(null);
+  }
+
+  const emptyStateMessage = hasActiveFilters
+    ? "no transactions match the current filters for this month. try clearing filters."
+    : "no transactions for this month yet. suspiciously peaceful.";
+
+  function renderTransactionBadges(row: TransactionListRow) {
+    return (
+      <div className="badge-row">
+        <span className={getTransactionTypeBadgeClass(row)}>
+          {getTransactionTypeBadgeLabel(row)}
+        </span>
+        <span
+          className={
+            row.source === "recurring"
+              ? "badge badge--recurring"
+              : "badge badge--neutral"
+          }
+        >
+          {row.source}
+        </span>
+      </div>
+    );
+  }
+
+  function renderTransactionActions(row: TransactionListRow) {
+    if (row.type === "opening-balance") {
+      return <span className="badge badge--muted">edit in accounts</span>;
+    }
+
+    return (
+      <div className="table-actions transaction-card__actions">
+        <button
+          type="button"
+          onClick={() => startEditingTransaction(row.id)}
+          style={compactSecondaryButtonStyle}
+        >
+          edit
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleDelete(row)}
+          style={compactDangerButtonStyle}
+        >
+          delete
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -243,7 +381,7 @@ export function TransactionsPage() {
           </div>
 
           {editingTransaction ? (
-            <div className="section-card section-card--surface">
+            <div ref={editSectionRef} className="section-card section-card--surface">
               <h2 className="section-title">edit transaction</h2>
 
               <TransactionForm
@@ -368,7 +506,7 @@ export function TransactionsPage() {
               </div>
             </div>
 
-            <div className="table-wrap">
+            <div className="table-wrap transaction-ledger-table">
               <table className="app-table">
                 <thead>
                   <tr>
@@ -386,129 +524,122 @@ export function TransactionsPage() {
                   {filteredTransactions.map((row) => (
                     <tr key={row.id}>
                       <td>{row.date}</td>
-                      <td>
-                        {row.type === "transfer"
-                          ? `${row.fromAccountName} → ${row.toAccountName}`
-                          : row.type === "opening-balance"
-                            ? "opening balance"
-                            : row.merchant ?? "—"}
-                      </td>
-                      <td>
-                        {row.type === "transfer"
-                          ? "transfer"
-                          : row.type === "opening-balance"
-                            ? "—"
-                            : categoryMap.get(row.categoryId) ?? "unknown"}
-                      </td>
+                      <td>{getTransactionDetails(row)}</td>
+                      <td>{getTransactionCategoryLabel(row, categoryMap)}</td>
                       <td>{row.type === "transfer" ? "—" : row.accountName}</td>
-                      <td>
-                        <div className="badge-row">
-                          <span
-                            className={
-                              row.type === "transfer"
-                                ? "badge badge--transfer"
-                                : row.type === "opening-balance"
-                                  ? "badge badge--opening"
-                                  : row.amountCents >= 0
-                                    ? "badge badge--income"
-                                    : "badge badge--expense"
-                            }
-                          >
-                            {row.type === "transfer"
-                              ? "transfer"
-                              : row.type === "opening-balance"
-                                ? "opening balance"
-                                : row.amountCents >= 0
-                                  ? "income"
-                                  : "expense"}
-                          </span>
-                          <span
-                            className={
-                              row.source === "recurring"
-                                ? "badge badge--recurring"
-                                : "badge badge--neutral"
-                            }
-                          >
-                            {row.source}
-                          </span>
-                        </div>
-                      </td>
-                      <td
-                        className={`money-column ${
-                          row.type === "transfer"
-                            ? "text-info font-semibold"
-                            : row.amountCents >= 0
-                              ? "text-positive font-semibold"
-                              : "text-negative font-semibold"
-                        }`}
-                      >
+                      <td>{renderTransactionBadges(row)}</td>
+                      <td className={`money-column ${getTransactionAmountClass(row)}`}>
                         {formatCents(row.amountCents)}
                       </td>
                       <td>{row.note ?? "—"}</td>
-                      <td>
-                        {row.type === "opening-balance" ? (
-                          <span className="badge badge--muted">edit in accounts</span>
-                        ) : (
-                          <div className="table-actions">
-                            {row.source === "recurring" && row.recurringRuleId ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingId(null);
-                                  setShowCreateForm(false);
-                                  updateSearchParams("recurring", row.recurringRuleId);
-                                }}
-                                style={compactSecondaryButtonStyle}
-                              >
-                                edit rule
-                              </button>
-                            ) : null}
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingId(row.id);
-                                setShowCreateForm(false);
-                              }}
-                              style={compactSecondaryButtonStyle}
-                            >
-                              edit
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(row)}
-                              style={compactDangerButtonStyle}
-                            >
-                              delete
-                            </button>
-                          </div>
-                        )}
-                      </td>
+                      <td>{renderTransactionActions(row)}</td>
                     </tr>
                   ))}
 
                   {filteredTransactions.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="table-cell--flush">
-                        <p className="empty-state">
-                          {hasActiveFilters
-                            ? "no transactions match the current filters for this month. try clearing filters."
-                            : "no transactions for this month yet. suspiciously peaceful."}
-                        </p>
+                        <p className="empty-state">{emptyStateMessage}</p>
                       </td>
                     </tr>
                   ) : null}
                 </tbody>
               </table>
             </div>
+
+            <div className="transaction-ledger-mobile" aria-label="transaction activity list">
+              {filteredTransactions.length === 0 ? (
+                <p className="empty-state">{emptyStateMessage}</p>
+              ) : (
+                filteredTransactions.map((row) => (
+                  (() => {
+                    const isExpanded = expandedTransactionId === row.id;
+
+                    return (
+                  <article
+                    key={row.id}
+                    className={
+                      row.type === "transfer"
+                        ? isExpanded
+                          ? "transaction-card transaction-card--transfer transaction-card--expanded"
+                          : "transaction-card transaction-card--transfer"
+                        : row.type === "opening-balance"
+                          ? isExpanded
+                            ? "transaction-card transaction-card--opening transaction-card--expanded"
+                            : "transaction-card transaction-card--opening"
+                          : isExpanded
+                            ? "transaction-card transaction-card--expanded"
+                            : "transaction-card"
+                    }
+                  >
+                    <button
+                      type="button"
+                      className="transaction-card__summary"
+                      aria-expanded={isExpanded}
+                      onClick={() => toggleExpandedTransaction(row.id)}
+                    >
+                      <div className="transaction-card__top">
+                        <div className="transaction-card__details-group">
+                          <div className="transaction-card__details">
+                            {getTransactionDetails(row)}
+                          </div>
+                        </div>
+
+                        <div className={`transaction-card__amount ${getTransactionAmountClass(row)}`}>
+                          {formatCents(row.amountCents)}
+                        </div>
+                      </div>
+
+                      <div className="transaction-card__summary-footer">
+                        <div className="transaction-card__summary-meta">
+                          <span className="transaction-card__date">{row.date}</span>
+                          <span className="transaction-card__separator" aria-hidden="true">
+                            ·
+                          </span>
+                          <span>{getTransactionAccountLabel(row)}</span>
+                        </div>
+
+                        <span className="transaction-card__chevron" aria-hidden="true">
+                          {isExpanded ? "▴" : "▾"}
+                        </span>
+                      </div>
+                    </button>
+
+                    {isExpanded ? (
+                      <div className="transaction-card__expanded-details">
+                        {row.type === "opening-balance" ? (
+                          <span className="transaction-card__eyebrow">account seed</span>
+                        ) : null}
+
+                        <div className="transaction-card__meta-line">
+                          <span>{getTransactionCategoryLabel(row, categoryMap)}</span>
+                          <span className="transaction-card__separator" aria-hidden="true">
+                            ·
+                          </span>
+                          <span>{getTransactionAccountLabel(row)}</span>
+                        </div>
+
+                        <div className="transaction-card__footer">
+                          <div className="transaction-card__date-and-badges">
+                            {renderTransactionBadges(row)}
+                          </div>
+
+                          {renderTransactionActions(row)}
+                        </div>
+
+                        {row.note ? <p className="transaction-card__note">{row.note}</p> : null}
+                      </div>
+                    ) : null}
+                  </article>
+                    );
+                  })()
+                ))
+              )}
+            </div>
           </div>
         </>
       ) : (
-        <RecurringManagementSection
-          requestedEditingRuleId={requestedRecurringRuleId}
-          onRequestedEditingRuleHandled={() => updateSearchParams("recurring")}
-        />
+        <RecurringManagementSection />
       )}
     </section>
   );
