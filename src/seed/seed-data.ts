@@ -1,10 +1,11 @@
-import type {
-  Account,
-  Budget,
-  Category,
-  PersistedState,
-  RecurringRule,
-  Transaction,
+import {
+  LATEST_PERSISTED_STATE_VERSION,
+  type Account,
+  type Budget,
+  type Category,
+  type PersistedState,
+  type RecurringRule,
+  type Transaction,
 } from "../types";
 
 const SEED_TIMESTAMP = "2026-04-01T00:00:00.000Z";
@@ -242,7 +243,7 @@ export const seedBudgets: Budget[] = [
 ];
 
 export const seedState: PersistedState = {
-  version: 1,
+  version: LATEST_PERSISTED_STATE_VERSION,
   accounts: seedAccounts,
   categories: seedCategories,
   transactions: seedTransactions,
@@ -252,10 +253,13 @@ export const seedState: PersistedState = {
 
 export function createSeedState(): PersistedState {
   return {
-    version: 1,
+    version: LATEST_PERSISTED_STATE_VERSION,
     accounts: seedAccounts.map((item) => ({ ...item })),
     categories: seedCategories.map((item) => ({ ...item })),
-    transactions: seedTransactions.map((item) => ({ ...item })),
+    transactions: seedTransactions.map((item) => ({
+      ...item,
+      splits: item.splits?.map((split) => ({ ...split })),
+    })),
     budgets: seedBudgets.map((item) => ({ ...item })),
     recurringRules: seedRecurringRules.map((item) => ({ ...item })),
   };

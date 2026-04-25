@@ -6,6 +6,7 @@ import {
   recurringRuleSchema,
   transactionSchema,
 } from "./validation";
+import { LATEST_PERSISTED_STATE_VERSION } from "../types";
 
 describe("validation schemas", () => {
   it("validates credit account credit-limit rules", () => {
@@ -50,7 +51,7 @@ describe("validation schemas", () => {
 
   it("treats transactions without kind as standard for persisted compatibility", () => {
     const result = persistedStateSchema.safeParse({
-      version: 1,
+      version: LATEST_PERSISTED_STATE_VERSION,
       accounts: [],
       categories: [],
       transactions: [
@@ -172,7 +173,7 @@ describe("validation schemas", () => {
 
   it("treats recurring rules without kind as standard for persisted compatibility", () => {
     const result = persistedStateSchema.safeParse({
-      version: 1,
+      version: LATEST_PERSISTED_STATE_VERSION,
       accounts: [],
       categories: [],
       transactions: [],
@@ -202,7 +203,7 @@ describe("validation schemas", () => {
 
   it("rejects orphaned transfer groups in persisted state", () => {
     const result = persistedStateSchema.safeParse({
-      version: 1,
+      version: LATEST_PERSISTED_STATE_VERSION,
       accounts: [],
       categories: [],
       transactions: [
@@ -232,7 +233,7 @@ describe("validation schemas", () => {
 
   it("rejects multiple opening-balance transactions for one account", () => {
     const result = persistedStateSchema.safeParse({
-      version: 1,
+      version: LATEST_PERSISTED_STATE_VERSION,
       accounts: [],
       categories: [],
       transactions: [
@@ -265,6 +266,232 @@ describe("validation schemas", () => {
     if (!result.success) {
       expect(result.error.issues[0]?.message).toBe(
         "account acct-1 cannot have more than one opening-balance transaction"
+      );
+    }
+  });
+
+  it("accepts valid split standard transactions", () => {
+    const result = transactionSchema.safeParse({
+      id: "txn-split",
+      kind: "standard",
+      date: "2026-04-01",
+      amountCents: -1200,
+      accountId: "acct-1",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -700,
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-household",
+          amountCents: -500,
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects split transactions with fewer than 2 rows", () => {
+    const result = transactionSchema.safeParse({
+      id: "txn-split",
+      kind: "standard",
+      date: "2026-04-01",
+      amountCents: -1200,
+      accountId: "acct-1",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -1200,
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        "split transactions require at least 2 rows"
+      );
+    }
+  });
+
+  it("rejects split transactions with mismatched totals", () => {
+    const result = transactionSchema.safeParse({
+      id: "txn-split",
+      kind: "standard",
+      date: "2026-04-01",
+      amountCents: -1200,
+      accountId: "acct-1",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -700,
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-household",
+          amountCents: -400,
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        "split transaction amounts must add up to the parent amount"
+      );
+    }
+  });
+
+  it("rejects split transactions with a parent categoryId", () => {
+    const result = transactionSchema.safeParse({
+      id: "txn-split",
+      kind: "standard",
+      date: "2026-04-01",
+      amountCents: -1200,
+      accountId: "acct-1",
+      categoryId: "cat-food",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -700,
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-household",
+          amountCents: -500,
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        "split transactions cannot include parent categoryId"
+      );
+    }
+  });
+
+  it("rejects transfer and opening-balance splits", () => {
+    const transferResult = transactionSchema.safeParse({
+      id: "txn-transfer",
+      kind: "transfer",
+      date: "2026-04-01",
+      amountCents: -1200,
+      accountId: "acct-1",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -700,
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-household",
+          amountCents: -500,
+        },
+      ],
+      source: "manual",
+      transferGroupId: "transfer-1",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    });
+    const openingResult = transactionSchema.safeParse({
+      id: "txn-opening",
+      kind: "opening-balance",
+      date: "2026-04-01",
+      amountCents: 1200,
+      accountId: "acct-1",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-income",
+          amountCents: 700,
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-income-bonus",
+          amountCents: 500,
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    });
+
+    expect(transferResult.success).toBe(false);
+    expect(openingResult.success).toBe(false);
+  });
+
+  it("rejects split transactions with mixed category kind semantics", () => {
+    const result = persistedStateSchema.safeParse({
+      version: LATEST_PERSISTED_STATE_VERSION,
+      accounts: [],
+      categories: [
+        {
+          id: "cat-food",
+          name: "Food",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "cat-income",
+          name: "Salary",
+          kind: "income",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-split",
+          kind: "standard",
+          date: "2026-04-01",
+          amountCents: -1200,
+          accountId: "acct-1",
+          splits: [
+            {
+              id: "split-1",
+              categoryId: "cat-food",
+              amountCents: -700,
+            },
+            {
+              id: "split-2",
+              categoryId: "cat-income",
+              amountCents: -500,
+            },
+          ],
+          source: "manual",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      budgets: [],
+      recurringRules: [],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        "split category cat-income must be a expense category"
       );
     }
   });

@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parsePersistedStateJson } from "./storage";
 import { createSeedState } from "../seed/seed-data";
-import type { PersistedState } from "../types";
+import {
+  LATEST_PERSISTED_STATE_VERSION,
+  type PersistedState,
+} from "../types";
 
 const storagekey = "budget-mvp";
 
@@ -36,7 +39,7 @@ class MemoryStorage implements Storage {
 
 function createPersistedState(overrides: Partial<PersistedState> = {}): PersistedState {
   return {
-    version: 1,
+    version: LATEST_PERSISTED_STATE_VERSION,
     accounts: [],
     categories: [],
     transactions: [],
@@ -1061,5 +1064,76 @@ describe("app store", () => {
         note: "pair-safe",
       }),
     ]);
+  });
+
+  it("adds, updates, and deletes split transactions as single records", async () => {
+    const { useAppStore } = await loadStore(createPersistedState());
+
+    useAppStore.getState().addTransaction({
+      id: "txn-split",
+      kind: "standard",
+      date: "2026-04-12",
+      amountCents: -3000,
+      accountId: "acct-checking",
+      merchant: "Warehouse",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -1200,
+          note: "produce",
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-home",
+          amountCents: -1800,
+          note: "supplies",
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-12T00:00:00.000Z",
+      updatedAt: "2026-04-12T00:00:00.000Z",
+    });
+
+    expect(useAppStore.getState().transactions).toHaveLength(1);
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      id: "txn-split",
+      splits: [
+        expect.objectContaining({ categoryId: "cat-food", amountCents: -1200 }),
+        expect.objectContaining({ categoryId: "cat-home", amountCents: -1800 }),
+      ],
+    });
+    expect(useAppStore.getState().transactions[0]).not.toHaveProperty("categoryId");
+
+    useAppStore.getState().updateTransaction("txn-split", {
+      amountCents: -3500,
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -2000,
+          note: "produce",
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-home",
+          amountCents: -1500,
+          note: "supplies",
+        },
+      ],
+    });
+
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      amountCents: -3500,
+      updatedAt: "2026-04-21T12:34:56.000Z",
+      splits: [
+        expect.objectContaining({ amountCents: -2000 }),
+        expect.objectContaining({ amountCents: -1500 }),
+      ],
+    });
+
+    useAppStore.getState().deleteTransaction("txn-split");
+
+    expect(useAppStore.getState().transactions).toEqual([]);
   });
 });

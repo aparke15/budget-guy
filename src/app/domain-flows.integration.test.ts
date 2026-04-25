@@ -8,7 +8,11 @@ import {
 } from "../lib/account-balances";
 import { createAccount } from "../lib/factories";
 import { getBudgetRows, getMonthlySummary } from "../lib/money";
-import type { PersistedState } from "../types";
+import { countTransactionCategoryUsageByCategoryId } from "../lib/transaction-splits";
+import {
+  LATEST_PERSISTED_STATE_VERSION,
+  type PersistedState,
+} from "../types";
 
 const storageKey = "budget-mvp";
 
@@ -44,7 +48,7 @@ function createPersistedState(
   overrides: Partial<PersistedState> = {}
 ): PersistedState {
   return {
-    version: 1,
+    version: LATEST_PERSISTED_STATE_VERSION,
     accounts: [],
     categories: [],
     transactions: [],
@@ -553,5 +557,131 @@ describe("domain flow integration", () => {
 
     transactions = useAppStore.getState().transactions;
     expect(transactions).toHaveLength(3);
+  });
+
+  it("uses split allocations for category reporting while keeping balances on the parent transaction", async () => {
+    const useAppStore = await loadStore(
+      createPersistedState({
+        accounts: [
+          {
+            id: "acct-checking",
+            name: "checking",
+            type: "checking",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+        ],
+        categories: [
+          {
+            id: "cat-food",
+            name: "food",
+            kind: "expense",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+          {
+            id: "cat-household",
+            name: "household",
+            kind: "expense",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+          {
+            id: "cat-income",
+            name: "salary",
+            kind: "income",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+        ],
+        budgets: [
+          {
+            id: "budget-food",
+            month: "2026-04",
+            categoryId: "cat-food",
+            plannedCents: 5000,
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+          {
+            id: "budget-household",
+            month: "2026-04",
+            categoryId: "cat-household",
+            plannedCents: 6000,
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+        ],
+      })
+    );
+
+    useAppStore.getState().addTransaction({
+      id: "txn-income",
+      kind: "standard",
+      date: "2026-04-03",
+      amountCents: 20000,
+      accountId: "acct-checking",
+      categoryId: "cat-income",
+      source: "manual",
+      createdAt: "2026-04-03T00:00:00.000Z",
+      updatedAt: "2026-04-03T00:00:00.000Z",
+    });
+    useAppStore.getState().addTransaction({
+      id: "txn-split",
+      kind: "standard",
+      date: "2026-04-04",
+      amountCents: -7000,
+      accountId: "acct-checking",
+      merchant: "warehouse",
+      splits: [
+        {
+          id: "split-food",
+          categoryId: "cat-food",
+          amountCents: -2500,
+        },
+        {
+          id: "split-household",
+          categoryId: "cat-household",
+          amountCents: -4500,
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-04T00:00:00.000Z",
+      updatedAt: "2026-04-04T00:00:00.000Z",
+    });
+
+    const { transactions, budgets, categories } = useAppStore.getState();
+
+    expect(getAccountBalanceCents(transactions, "acct-checking")).toBe(13000);
+    expect(getMonthlySummary(transactions, budgets, "2026-04")).toEqual({
+      incomeCents: 20000,
+      expenseCents: 7000,
+      netCents: 13000,
+      plannedCents: 11000,
+      unassignedCents: 9000,
+    });
+    expect(getBudgetRows(categories, budgets, transactions, "2026-04")).toEqual([
+      {
+        categoryId: "cat-household",
+        categoryName: "household",
+        plannedCents: 6000,
+        actualCents: 4500,
+        remainingCents: 1500,
+        overBudget: false,
+      },
+      {
+        categoryId: "cat-food",
+        categoryName: "food",
+        plannedCents: 5000,
+        actualCents: 2500,
+        remainingCents: 2500,
+        overBudget: false,
+      },
+    ]);
+    expect(countTransactionCategoryUsageByCategoryId(transactions)).toEqual({
+      "cat-income": 1,
+      "cat-food": 1,
+      "cat-household": 1,
+    });
   });
 });

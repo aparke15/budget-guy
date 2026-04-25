@@ -1,4 +1,5 @@
 import { formatSignedCentsForInput, parseAmountInputToCents } from "../../lib/money";
+import { countTransactionsReferencingCategory } from "../../lib/transaction-splits";
 import type { AccountFormValues } from "../types";
 import type { Account, Budget, RecurringRule, Transaction } from "../../types";
 
@@ -182,9 +183,10 @@ export function buildDeleteImpact(
     const budgetCount = budgets.filter(
       (budget) => budget.categoryId === pendingDelete.id
     ).length;
-    const transactionCount = transactions.filter(
-      (transaction) => transaction.categoryId === pendingDelete.id
-    ).length;
+    const transactionCount = countTransactionsReferencingCategory(
+      transactions,
+      pendingDelete.id
+    );
     const ruleCount = recurringRules.filter(
       (rule) => rule.categoryId === pendingDelete.id
     ).length;

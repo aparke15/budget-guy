@@ -1,16 +1,72 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildBackupFileName,
   buildPersistedStateSnapshot,
   exportPersistedStateJson,
+  loadPersistedState,
+  loadOrCreatePersistedState,
   parsePersistedStateJson,
+  STORAGE_KEY,
 } from "./storage";
-import type { PersistedState } from "../types";
+import { createSeedState } from "../seed/seed-data";
+import { LATEST_PERSISTED_STATE_VERSION, type PersistedState } from "../types";
+
+const LEGACY_PERSISTED_STATE_FIXTURE = {
+  accounts: [
+    {
+      id: "acct-1",
+      name: "checking",
+      type: "checking" as const,
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    },
+  ],
+  categories: [
+    {
+      id: "cat-1",
+      name: "rent",
+      kind: "expense" as const,
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    },
+  ],
+  transactions: [
+    {
+      id: "txn-1",
+      date: "2026-04-01",
+      amountCents: -120000,
+      accountId: "acct-1",
+      categoryId: "cat-1",
+      source: "manual" as const,
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    },
+  ],
+  budgets: [],
+  recurringRules: [],
+};
+
+function installLocalStorageMock() {
+  const storage = new Map<string, string>();
+
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        storage.set(key, value);
+      },
+      removeItem: (key: string) => {
+        storage.delete(key);
+      },
+    },
+  });
+}
 
 function createPersistedState(overrides: Partial<PersistedState> = {}): PersistedState {
   return {
-    version: 1,
+    version: LATEST_PERSISTED_STATE_VERSION,
     accounts: [],
     categories: [],
     transactions: [],
@@ -21,6 +77,10 @@ function createPersistedState(overrides: Partial<PersistedState> = {}): Persiste
 }
 
 describe("storage helpers", () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
   it("builds the full persisted state snapshot shape", () => {
     expect(
       buildPersistedStateSnapshot({
@@ -58,7 +118,7 @@ describe("storage helpers", () => {
         ],
       })
     );
-    expect(json).toContain('"version": 1');
+    expect(json).toContain(`"version": ${LATEST_PERSISTED_STATE_VERSION}`);
     expect(json).toContain('\n  "accounts": [');
   });
 
@@ -95,6 +155,25 @@ describe("storage helpers", () => {
     });
   });
 
+  it("parses legacy json through the migration pipeline", () => {
+    const result = parsePersistedStateJson(
+      JSON.stringify(LEGACY_PERSISTED_STATE_FIXTURE)
+    );
+
+    expect(result).toEqual({
+      success: true,
+      data: createPersistedState({
+        ...LEGACY_PERSISTED_STATE_FIXTURE,
+        transactions: [
+          {
+            kind: "standard",
+            ...LEGACY_PERSISTED_STATE_FIXTURE.transactions[0],
+          },
+        ],
+      }),
+    });
+  });
+
   it("rejects invalid json and schema-invalid payloads", () => {
     expect(parsePersistedStateJson("{not json}")).toEqual({
       success: false,
@@ -104,7 +183,7 @@ describe("storage helpers", () => {
     expect(
       parsePersistedStateJson(
         JSON.stringify({
-          version: 2,
+          version: LATEST_PERSISTED_STATE_VERSION + 1,
           accounts: [],
           categories: [],
           transactions: [],
@@ -114,8 +193,41 @@ describe("storage helpers", () => {
       )
     ).toEqual({
       success: false,
-      error: "Invalid input: expected 1",
+      error: `unsupported persisted state version: ${LATEST_PERSISTED_STATE_VERSION + 1}`,
     });
+  });
+
+  it("loads legacy local storage through the same migration pipeline", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(LEGACY_PERSISTED_STATE_FIXTURE));
+
+    expect(loadPersistedState()).toEqual(
+      createPersistedState({
+        ...LEGACY_PERSISTED_STATE_FIXTURE,
+        transactions: [
+          {
+            kind: "standard",
+            ...LEGACY_PERSISTED_STATE_FIXTURE.transactions[0],
+          },
+        ],
+      })
+    );
+  });
+
+  it("falls back to seeded latest-version data when saved state is invalid", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        accounts: [],
+        categories: [],
+        transactions: [],
+        budgets: [],
+      })
+    );
+
+    const seeded = createSeedState();
+
+    expect(loadOrCreatePersistedState()).toEqual(seeded);
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null")).toEqual(seeded);
   });
 
   it("builds a dated backup filename", () => {

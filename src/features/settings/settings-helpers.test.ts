@@ -220,6 +220,51 @@ describe("settings helpers", () => {
     });
   });
 
+  it("counts split transaction references in category delete impact", () => {
+    const pendingDelete: PendingDelete = {
+      entity: "category",
+      id: "cat-split",
+      name: "groceries",
+    };
+
+    expect(
+      buildDeleteImpact(
+        pendingDelete,
+        budgets,
+        [
+          ...transactions,
+          {
+            id: "txn-split",
+            kind: "standard",
+            date: "2026-04-20",
+            amountCents: -3000,
+            accountId: "acct-1",
+            splits: [
+              {
+                id: "split-1",
+                categoryId: "cat-split",
+                amountCents: -1200,
+              },
+              {
+                id: "split-2",
+                categoryId: "cat-1",
+                amountCents: -1800,
+              },
+            ],
+            source: "manual",
+            createdAt: "2026-04-20T00:00:00.000Z",
+            updatedAt: "2026-04-20T00:00:00.000Z",
+          },
+        ],
+        recurringRules
+      )
+    ).toEqual({
+      title: "delete category: groceries",
+      description:
+        "this will remove 0 budgets, 1 transaction, and 0 recurring rules.",
+    });
+  });
+
   it("builds recurring rule delete impact copy", () => {
     const pendingDelete: PendingDelete = {
       entity: "rule",

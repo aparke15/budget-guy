@@ -52,7 +52,11 @@ function getTransactionCategoryLabel(
     return "opening balance";
   }
 
-  return categoryMap.get(row.categoryId) ?? "unknown";
+  if (row.splits?.length) {
+    return `split · ${row.splits.length} categories`;
+  }
+
+  return row.categoryId ? categoryMap.get(row.categoryId) ?? "unknown" : "unknown";
 }
 
 function getTransactionAccountLabel(row: TransactionListRow) {
@@ -245,6 +249,9 @@ export function TransactionsPage() {
         <span className={getTransactionTypeBadgeClass(row)}>
           {getTransactionTypeBadgeLabel(row)}
         </span>
+        {row.type === "standard" && row.splits?.length ? (
+          <span className="badge badge--neutral">split</span>
+        ) : null}
         <span
           className={
             row.source === "recurring"
@@ -254,6 +261,40 @@ export function TransactionsPage() {
         >
           {row.source}
         </span>
+      </div>
+    );
+  }
+
+  function renderSplitBreakdown(row: TransactionListRow) {
+    if (row.type !== "standard" || !row.splits?.length) {
+      return null;
+    }
+
+    return (
+      <div className="stack-sm">
+        {row.splits.map((split) => (
+          <div
+            key={split.id}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "0.75rem",
+              alignItems: "baseline",
+            }}
+          >
+            <div className="stack-sm" style={{ minWidth: 0, gap: "0.15rem" }}>
+              <span>
+                {categoryMap.get(split.categoryId) ?? "unknown"}
+              </span>
+              {split.note ? (
+                <span className="muted-text">{split.note}</span>
+              ) : null}
+            </div>
+            <span className={split.amountCents >= 0 ? "text-positive" : "text-negative"}>
+              {formatCents(split.amountCents)}
+            </span>
+          </div>
+        ))}
       </div>
     );
   }
@@ -618,6 +659,8 @@ export function TransactionsPage() {
                           </span>
                           <span>{getTransactionAccountLabel(row)}</span>
                         </div>
+
+                        {renderSplitBreakdown(row)}
 
                         <div className="transaction-card__footer">
                           <div className="transaction-card__date-and-badges">

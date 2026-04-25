@@ -6,6 +6,7 @@ import type {
   Transaction,
 } from "../types";
 import { getMonthKey } from "./dates";
+import { getTransactionCategoryAllocations } from "./transaction-splits";
 
 export function formatCents(
   amountCents: number,
@@ -79,11 +80,14 @@ export function sumCategoryActualCents(
     .filter(
       (transaction) =>
         getMonthKey(transaction.date) === month &&
-        transaction.kind === "standard" &&
-        transaction.categoryId === categoryId &&
-        transaction.amountCents < 0
+        transaction.kind === "standard"
     )
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amountCents), 0);
+    .flatMap((transaction) => getTransactionCategoryAllocations(transaction))
+    .filter(
+      (allocation) =>
+        allocation.categoryId === categoryId && allocation.amountCents < 0
+    )
+    .reduce((sum, allocation) => sum + Math.abs(allocation.amountCents), 0);
 }
 
 export function getMonthlySummary(

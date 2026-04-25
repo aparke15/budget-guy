@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useAppStore } from "../../app/store";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents, getBudgetRows, getMonthlySummary } from "../../lib/money";
+import { hasTransactionSplits } from "../../lib/transaction-splits";
 import { inputStyle, primaryButtonStyle } from "../components/style-constants";
 import { RecurringGenerationFeedback } from "../recurring/recurring-generation-feedback";
 
@@ -86,6 +87,10 @@ export function DashboardPage() {
 
     if (transaction.kind === "opening-balance") {
       return "opening balance";
+    }
+
+    if (hasTransactionSplits(transaction)) {
+      return `split · ${transaction.splits.length} categories`;
     }
 
     return transaction.categoryId

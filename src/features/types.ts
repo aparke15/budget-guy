@@ -7,6 +7,7 @@ import type {
   RecurringRuleKind,
   RecurringRule,
   Transaction,
+  TransactionSplit,
 } from "../types";
 
 export type TransactionEntryType = CategoryKind | "transfer";
@@ -25,6 +26,13 @@ export type TransactionFormValues = {
   amount: string;
   accountId: string;
   categoryId: string;
+  isSplit: boolean;
+  splits: Array<{
+    id: TransactionSplit["id"];
+    categoryId: TransactionSplit["categoryId"];
+    amount: string;
+    note: string;
+  }>;
   merchant: string;
   note: string;
   fromAccountId: string;

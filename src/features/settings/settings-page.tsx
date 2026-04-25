@@ -14,6 +14,10 @@ import {
   parsePersistedStateJson,
 } from "../../app/storage";
 import { createCategory } from "../../lib/factories";
+import {
+  countTransactionCategoryUsageByCategoryId,
+  transactionReferencesCategory,
+} from "../../lib/transaction-splits";
 import type { Category, PersistedState } from "../../types";
 import { CategoryEditor } from "../components/editors";
 import {
@@ -420,7 +424,7 @@ export function SettingsPage() {
   );
 
   const categoryTransactionCounts = useMemo(
-    () => countById(transactions, (transaction) => transaction.categoryId),
+    () => countTransactionCategoryUsageByCategoryId(transactions),
     [transactions]
   );
 
@@ -443,7 +447,9 @@ export function SettingsPage() {
       .filter((budget) => budget.categoryId === pendingDelete.id)
       .forEach((budget) => deleteBudget(budget.id));
     transactions
-      .filter((transaction) => transaction.categoryId === pendingDelete.id)
+      .filter((transaction) =>
+        transactionReferencesCategory(transaction, pendingDelete.id)
+      )
       .forEach((transaction) => deleteTransaction(transaction.id));
     recurringRules
       .filter((rule) => rule.categoryId === pendingDelete.id)
