@@ -1,4 +1,5 @@
 import { getMonthKey } from "../../lib/dates";
+import { getTransactionCategoryIds, hasTransactionSplits } from "../../lib/transaction-splits";
 import type { Account, Transaction } from "../../types";
 
 export type TransactionFilters = {
@@ -16,7 +17,9 @@ export type TransactionListRow =
       amountCents: number;
       accountId: string;
       accountName: string;
-      categoryId: string;
+      categoryId?: string;
+      categoryIds: string[];
+      splits: Transaction["splits"];
       merchant?: string;
       note?: string;
       source: Transaction["source"];
@@ -80,7 +83,9 @@ export function buildTransactionListRows(
           amountCents: transaction.amountCents,
           accountId: transaction.accountId,
           accountName: accountMap.get(transaction.accountId) ?? "unknown",
-          categoryId: transaction.categoryId ?? "",
+          categoryId: transaction.categoryId,
+          categoryIds: getTransactionCategoryIds(transaction),
+          splits: hasTransactionSplits(transaction) ? transaction.splits : undefined,
           merchant: transaction.merchant,
           note: transaction.note,
           source: transaction.source,
@@ -175,7 +180,7 @@ export function filterTransactionRows(
         return false;
       }
 
-      if (row.categoryId !== filters.categoryId) {
+      if (!row.categoryIds.includes(filters.categoryId)) {
         return false;
       }
     }

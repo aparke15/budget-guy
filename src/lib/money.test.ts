@@ -249,6 +249,64 @@ describe("money utilities", () => {
     });
   });
 
+  it("fans split transactions out for category actuals while keeping month totals on parent amounts", () => {
+    const withSplit: Transaction[] = [
+      ...transactions,
+      {
+        id: "txn-split",
+        kind: "standard",
+        date: "2026-04-04",
+        amountCents: -3000,
+        accountId: "acct-1",
+        merchant: "Big Box",
+        splits: [
+          {
+            id: "split-food",
+            categoryId: "cat-food",
+            amountCents: -1200,
+          },
+          {
+            id: "split-rent",
+            categoryId: "cat-rent",
+            amountCents: -1800,
+          },
+        ],
+        source: "manual",
+        createdAt: "2026-04-04T00:00:00.000Z",
+        updatedAt: "2026-04-04T00:00:00.000Z",
+      },
+    ];
+
+    expect(sumExpenseCents(withSplit, "2026-04")).toBe(127500);
+    expect(sumCategoryActualCents(withSplit, "2026-04", "cat-food")).toBe(5700);
+    expect(sumCategoryActualCents(withSplit, "2026-04", "cat-rent")).toBe(121800);
+    expect(getMonthlySummary(withSplit, budgets, "2026-04")).toEqual({
+      incomeCents: 250000,
+      expenseCents: 127500,
+      netCents: 122500,
+      plannedCents: 130000,
+      unassignedCents: 120000,
+    });
+    expect(getBudgetRows(categories, budgets, withSplit, "2026-04")).toEqual([
+      {
+        categoryId: "cat-rent",
+        categoryName: "Rent",
+        plannedCents: 110000,
+        actualCents: 121800,
+        remainingCents: -11800,
+        overBudget: true,
+      },
+      {
+        categoryId: "cat-food",
+        categoryName: "Food",
+        plannedCents: 20000,
+        actualCents: 5700,
+        remainingCents: 14300,
+        overBudget: false,
+      },
+    ]);
+  });
+
   it("builds budget rows for expense categories only and sorts by actual spend", () => {
     expect(getBudgetRows(categories, budgets, transactions, "2026-04")).toEqual([
       {

@@ -2,6 +2,10 @@ import {
   createRecurringRule,
   getDefaultRecurringTransferAccountId,
 } from "../../lib/factories";
+import {
+  getActiveCategories,
+  getSelectableCategories,
+} from "../../lib/categories";
 import { formatCentsForInput, parseAmountInputToCents } from "../../lib/money";
 import { recurringRuleSchema } from "../../lib/validation";
 import type {
@@ -18,7 +22,13 @@ function getDefaultAccountId(accounts: Account[]): string {
 }
 
 function getDefaultCategoryId(categories: Category[]): string {
-  return categories.find((category) => category.kind === "expense")?.id ?? categories[0]?.id ?? "";
+  const activeCategories = getActiveCategories(categories);
+
+  return (
+    activeCategories.find((category) => category.kind === "expense")?.id ??
+    activeCategories[0]?.id ??
+    ""
+  );
 }
 
 function getDayOfMonthFromDate(date: string): string {
@@ -132,6 +142,9 @@ export function ensureRecurringFormReferences(
   accounts: Account[],
   categories: Category[]
 ): RecurringRuleFormValues {
+  const selectableCategories = getSelectableCategories(categories, {
+    includeCategoryId: values.categoryId,
+  });
   const nextAccountId =
     accounts.some((account) => account.id === values.accountId)
       ? values.accountId
@@ -141,7 +154,7 @@ export function ensureRecurringFormReferences(
       ? values.toAccountId
       : getDefaultRecurringTransferAccountId(accounts, nextAccountId);
   const nextCategoryId =
-    categories.some((category) => category.id === values.categoryId)
+    selectableCategories.some((category) => category.id === values.categoryId)
       ? values.categoryId
       : getDefaultCategoryId(categories);
 
@@ -160,6 +173,9 @@ export function updateRecurringKind(
   categories: Category[]
 ): RecurringRuleFormValues {
   const nextAccountId = values.accountId || getDefaultAccountId(accounts);
+  const selectableCategories = getSelectableCategories(categories, {
+    includeCategoryId: values.categoryId,
+  });
 
   return {
     ...values,
@@ -171,7 +187,7 @@ export function updateRecurringKind(
         : values.toAccountId,
     categoryId:
       kind === "standard"
-        ? values.categoryId || getDefaultCategoryId(categories)
+        ? values.categoryId || getDefaultCategoryId(selectableCategories)
         : values.categoryId,
     merchant: kind === "transfer" ? "" : values.merchant,
   };

@@ -5,7 +5,12 @@ import {
   createTransaction,
   createTransactionFormValues,
 } from "../../lib/factories";
-import { parseAmountInputToCents } from "../../lib/money";
+import {
+  getCategoryDisplayName,
+  getSelectableCategories,
+} from "../../lib/categories";
+import { makeId } from "../../lib/ids";
+import { formatCents, parseAmountInputToCents } from "../../lib/money";
 import {
   inputStyle,
   primaryButtonStyle,
@@ -13,6 +18,28 @@ import {
   textAreaStyle,
 } from "../components/style-constants";
 import type { TransactionFormProps, TransactionFormValues } from "../types";
+
+function createEmptySplitRows(categoryId: string): TransactionFormValues["splits"] {
+  return [0, 1].map(() => ({
+    id: makeId("split"),
+    categoryId,
+    amount: "",
+    note: "",
+  }));
+}
+
+function stripNegativeSign(value: string): string {
+  return value.replace(/-/g, "");
+}
+
+function getAllocatedSplitAmountCents(
+  splits: TransactionFormValues["splits"]
+): number {
+  return splits.reduce(
+    (sum, split) => sum + (parseAmountInputToCents(split.amount) ?? 0),
+    0
+  );
+}
 
 export function TransactionForm(props: TransactionFormProps) {
   const {
@@ -36,14 +63,27 @@ export function TransactionForm(props: TransactionFormProps) {
 
   const standardKind = values.entryType === "income" ? "income" : "expense";
   const isTransferMode = values.entryType === "transfer";
+  const isSplitMode = !isTransferMode && values.isSplit;
+  const selectedCategoryIds = useMemo(
+    () => [values.categoryId, ...values.splits.map((split) => split.categoryId)],
+    [values.categoryId, values.splits]
+  );
 
   const matchingCategories = useMemo(
-    () => categories.filter((category) => category.kind === standardKind),
-    [categories, standardKind]
+    () =>
+      getSelectableCategories(categories, {
+        kind: standardKind,
+        includeCategoryIds: selectedCategoryIds,
+      }),
+    [categories, selectedCategoryIds, standardKind]
   );
 
   useEffect(() => {
     if (isTransferMode) {
+      return;
+    }
+
+    if (values.isSplit) {
       return;
     }
 
@@ -57,11 +97,68 @@ export function TransactionForm(props: TransactionFormProps) {
         categoryId: matchingCategories[0]?.id ?? "",
       }));
     }
-  }, [isTransferMode, matchingCategories, values.categoryId]);
+  }, [isTransferMode, matchingCategories, values.categoryId, values.isSplit]);
+
+  useEffect(() => {
+    if (isTransferMode || !values.isSplit) {
+      return;
+    }
+
+    const fallbackCategoryId = matchingCategories[0]?.id ?? "";
+    const nextSplits = values.splits.length > 0
+      ? values.splits.map((split) => {
+          const categoryIsValid = matchingCategories.some(
+            (category) => category.id === split.categoryId
+          );
+
+          return categoryIsValid
+            ? split
+            : {
+                ...split,
+                categoryId: fallbackCategoryId,
+              };
+        })
+      : createEmptySplitRows(fallbackCategoryId);
+
+    const splitsChanged =
+      nextSplits.length !== values.splits.length ||
+      nextSplits.some(
+        (split, index) => split.categoryId !== values.splits[index]?.categoryId
+      );
+
+    if (splitsChanged) {
+      setValues((current) => ({
+        ...current,
+        splits: nextSplits,
+      }));
+    }
+  }, [isTransferMode, matchingCategories, values.isSplit, values.splits]);
 
   const transferAmountCents = useMemo(
     () => parseAmountInputToCents(values.amount),
     [values.amount]
+  );
+
+  const splitAllocatedCents = useMemo(
+    () => getAllocatedSplitAmountCents(values.splits),
+    [values.splits]
+  );
+
+  const splitRemainingCents = useMemo(() => {
+    const totalAmountCents = parseAmountInputToCents(values.amount) ?? 0;
+
+    return totalAmountCents - splitAllocatedCents;
+  }, [splitAllocatedCents, values.amount]);
+
+  const splitRowsAreValid = useMemo(
+    () =>
+      values.splits.length >= 2 &&
+      values.splits.every(
+        (split) =>
+          Boolean(split.categoryId) &&
+          (parseAmountInputToCents(split.amount) ?? 0) > 0
+      ),
+    [values.splits]
   );
 
   const transferSubmitDisabled =
@@ -73,6 +170,20 @@ export function TransactionForm(props: TransactionFormProps) {
       transferAmountCents == null ||
       transferAmountCents <= 0);
 
+  const standardSubmitDisabled =
+    !isTransferMode &&
+    (!values.date ||
+      !values.accountId ||
+      transferAmountCents == null ||
+      transferAmountCents <= 0 ||
+      (isSplitMode
+        ? !splitRowsAreValid || splitRemainingCents !== 0
+        : !values.categoryId));
+
+  const submitDisabled = isTransferMode
+    ? transferSubmitDisabled
+    : standardSubmitDisabled;
+
   function updateField<K extends keyof TransactionFormValues>(
     key: K,
     nextValue: TransactionFormValues[K]
@@ -83,11 +194,84 @@ export function TransactionForm(props: TransactionFormProps) {
     }));
   }
 
+  function updateSplitRow(
+    splitId: string,
+    key: keyof TransactionFormValues["splits"][number],
+    nextValue: string
+  ) {
+    setValues((current) => ({
+      ...current,
+      splits: current.splits.map((split) =>
+        split.id === splitId
+          ? {
+              ...split,
+              [key]: nextValue,
+            }
+          : split
+      ),
+    }));
+  }
+
+  function addSplitRow() {
+    const fallbackCategoryId =
+      values.splits[values.splits.length - 1]?.categoryId ||
+      values.categoryId ||
+      matchingCategories[0]?.id ||
+      "";
+
+    setValues((current) => ({
+      ...current,
+      splits: [
+        ...current.splits,
+        {
+          id: makeId("split"),
+          categoryId: fallbackCategoryId,
+          amount: "",
+          note: "",
+        },
+      ],
+    }));
+  }
+
+  function removeSplitRow(splitId: string) {
+    setValues((current) => ({
+      ...current,
+      splits: current.splits.filter((split) => split.id !== splitId),
+    }));
+  }
+
+  function handleSplitToggle(nextIsSplit: boolean) {
+    if (isTransferMode) {
+      return;
+    }
+
+    setValues((current) => {
+      const fallbackCategoryId =
+        current.categoryId ||
+        current.splits[0]?.categoryId ||
+        matchingCategories[0]?.id ||
+        "";
+
+      return {
+        ...current,
+        isSplit: nextIsSplit,
+        categoryId: fallbackCategoryId,
+        splits:
+          nextIsSplit && current.splits.length === 0
+            ? createEmptySplitRows(fallbackCategoryId)
+            : current.splits.length > 0
+              ? current.splits
+              : createEmptySplitRows(fallbackCategoryId),
+      };
+    });
+  }
+
   function handleTypeSwap(nextEntryType: "income" | "expense" | "transfer") {
     if (nextEntryType === "transfer") {
       setValues((current) => ({
         ...current,
         entryType: "transfer",
+        isSplit: false,
         fromAccountId: current.fromAccountId || current.accountId || accounts[0]?.id || "",
         toAccountId:
           current.toAccountId ||
@@ -100,13 +284,20 @@ export function TransactionForm(props: TransactionFormProps) {
     }
 
     const nextCategoryId =
-      categories.find((category) => category.kind === nextEntryType)?.id ?? "";
+      getSelectableCategories(categories, { kind: nextEntryType })[0]?.id ?? "";
 
     setValues((current) => ({
       ...current,
       entryType: nextEntryType,
       accountId: current.accountId || current.fromAccountId,
       categoryId: nextCategoryId,
+      splits:
+        current.splits.length > 0
+          ? current.splits.map((split) => ({
+              ...split,
+              categoryId: nextCategoryId,
+            }))
+          : createEmptySplitRows(nextCategoryId),
     }));
   }
 
@@ -124,6 +315,11 @@ export function TransactionForm(props: TransactionFormProps) {
       return;
     }
 
+    if (transferAmountCents == null || transferAmountCents <= 0) {
+      setError("amount must be a positive number");
+      return;
+    }
+
     try {
       if (isTransferMode) {
         const input = createTransferInput(values);
@@ -137,8 +333,23 @@ export function TransactionForm(props: TransactionFormProps) {
           input,
         });
       } else {
-        if (!values.categoryId) {
+        if (!isSplitMode && !values.categoryId) {
           setError("category is required");
+          return;
+        }
+
+        if (isSplitMode && values.splits.length < 2) {
+          setError("split transactions require at least 2 rows");
+          return;
+        }
+
+        if (isSplitMode && !splitRowsAreValid) {
+          setError("each split row needs a category and positive amount");
+          return;
+        }
+
+        if (isSplitMode && splitRemainingCents !== 0) {
+          setError("split amounts must add up to the transaction total");
           return;
         }
 
@@ -191,14 +402,7 @@ export function TransactionForm(props: TransactionFormProps) {
             inputMode="decimal"
             placeholder="0.00"
             value={values.amount}
-            onChange={(event) =>
-              updateField(
-                "amount",
-                isTransferMode
-                  ? event.target.value.replace(/-/g, "")
-                  : event.target.value
-              )
-            }
+            onChange={(event) => updateField("amount", stripNegativeSign(event.target.value))}
             style={inputStyle}
           />
         </label>
@@ -265,21 +469,23 @@ export function TransactionForm(props: TransactionFormProps) {
               </select>
             </label>
 
-            <label className="field">
-              <span className="field__label">category</span>
-              <select
-                value={values.categoryId}
-                onChange={(event) => updateField("categoryId", event.target.value)}
-                style={inputStyle}
-              >
-                <option value="">select category</option>
-                {matchingCategories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {!isSplitMode ? (
+              <label className="field">
+                <span className="field__label">category</span>
+                <select
+                  value={values.categoryId}
+                  onChange={(event) => updateField("categoryId", event.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="">select category</option>
+                  {matchingCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {getCategoryDisplayName(category)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
 
             <label className="field">
               <span className="field__label">merchant</span>
@@ -290,9 +496,128 @@ export function TransactionForm(props: TransactionFormProps) {
                 style={inputStyle}
               />
             </label>
+
+            <label className="field">
+              <span className="field__label">split transaction</span>
+              <span
+                style={{
+                  ...inputStyle,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.6rem",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={values.isSplit}
+                  onChange={(event) => handleSplitToggle(event.target.checked)}
+                />
+                <span>allocate this transaction across categories</span>
+              </span>
+            </label>
           </>
         )}
       </div>
+
+      {isSplitMode ? (
+        <div className="section-card section-card--surface stack-sm">
+          <div className="section-header">
+            <div className="section-title-group">
+              <h3 className="section-title">split allocation</h3>
+              <p className="section-subtitle">
+                keep the parent amount as the ledger total. split rows only drive category reporting.
+              </p>
+            </div>
+
+            <button type="button" onClick={addSplitRow} style={secondaryButtonStyle}>
+              add split row
+            </button>
+          </div>
+
+          {values.splits.map((split, index) => (
+            <div key={split.id} className="form-grid">
+              <label className="field">
+                <span className="field__label">category {index + 1}</span>
+                <select
+                  value={split.categoryId}
+                  onChange={(event) =>
+                    updateSplitRow(split.id, "categoryId", event.target.value)
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">select category</option>
+                  {matchingCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {getCategoryDisplayName(category)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span className="field__label">amount</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={split.amount}
+                  onChange={(event) =>
+                    updateSplitRow(split.id, "amount", stripNegativeSign(event.target.value))
+                  }
+                  style={inputStyle}
+                />
+              </label>
+
+              <label className="field">
+                <span className="field__label">split note</span>
+                <input
+                  type="text"
+                  value={split.note}
+                  onChange={(event) =>
+                    updateSplitRow(split.id, "note", event.target.value)
+                  }
+                  style={inputStyle}
+                />
+              </label>
+
+              <div className="field">
+                <span className="field__label">remove</span>
+                <button
+                  type="button"
+                  onClick={() => removeSplitRow(split.id)}
+                  disabled={values.splits.length <= 2}
+                  style={{
+                    ...secondaryButtonStyle,
+                    cursor: values.splits.length <= 2 ? "not-allowed" : "pointer",
+                    opacity: values.splits.length <= 2 ? 0.6 : 1,
+                  }}
+                >
+                  remove row
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <div className="toolbar toolbar--spaced">
+            <p className="muted-text">
+              allocated {formatCents(splitAllocatedCents)} · remaining {formatCents(splitRemainingCents)}
+            </p>
+
+            <div className="badge-row">
+              <span className="badge badge--neutral">
+                {values.splits.length} split row{values.splits.length === 1 ? "" : "s"}
+              </span>
+              <span
+                className={
+                  splitRemainingCents === 0 ? "badge badge--income" : "badge badge--expense"
+                }
+              >
+                {splitRemainingCents === 0 ? "balanced" : "needs allocation"}
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <label className="field">
         <span className="field__label">note</span>
@@ -313,11 +638,11 @@ export function TransactionForm(props: TransactionFormProps) {
       <div className="button-row">
         <button
           type="submit"
-          disabled={transferSubmitDisabled}
+          disabled={submitDisabled}
           style={{
             ...primaryButtonStyle,
-            cursor: transferSubmitDisabled ? "not-allowed" : "pointer",
-            opacity: transferSubmitDisabled ? 0.7 : 1,
+            cursor: submitDisabled ? "not-allowed" : "pointer",
+            opacity: submitDisabled ? 0.7 : 1,
           }}
         >
           {submitLabel}

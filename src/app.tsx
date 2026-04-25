@@ -31,7 +31,7 @@ export default function App() {
       <header className="app-header">
         <div className="app-header__content">
           <div className="app-brand">
-            <div className="app-brand__title">budget mvp</div>
+            <div className="app-brand__title">budget guy</div>
             <div className="app-brand__subtitle">
               local-first and gloriously unbank-synced
             </div>

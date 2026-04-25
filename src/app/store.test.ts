@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parsePersistedStateJson } from "./storage";
 import { createSeedState } from "../seed/seed-data";
-import type { PersistedState } from "../types";
+import {
+  LATEST_PERSISTED_STATE_VERSION,
+  type PersistedState,
+} from "../types";
 
 const storagekey = "budget-mvp";
 
@@ -34,11 +37,42 @@ class MemoryStorage implements Storage {
   }
 }
 
+function guessCategoryKind(categoryId: string): "income" | "expense" {
+  return categoryId.includes("income") || categoryId.includes("salary")
+    ? "income"
+    : "expense";
+}
+
+function getReferencedCategoryIds(overrides: Partial<PersistedState>): string[] {
+  return [
+    ...(overrides.transactions ?? []).flatMap((transaction) => [
+      ...(transaction.categoryId ? [transaction.categoryId] : []),
+      ...(transaction.splits?.map((split) => split.categoryId) ?? []),
+    ]),
+    ...(overrides.budgets ?? []).map((budget) => budget.categoryId),
+    ...(overrides.recurringRules ?? []).flatMap((rule) =>
+      rule.categoryId ? [rule.categoryId] : []
+    ),
+  ];
+}
+
 function createPersistedState(overrides: Partial<PersistedState> = {}): PersistedState {
+  const categories = overrides.categories ?? [];
+  const existingCategoryIds = new Set(categories.map((category) => category.id));
+  const inferredCategories = getReferencedCategoryIds(overrides)
+    .filter((categoryId) => !existingCategoryIds.has(categoryId))
+    .map((categoryId) => ({
+      id: categoryId,
+      name: categoryId,
+      kind: guessCategoryKind(categoryId),
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    }));
+
   return {
-    version: 1,
+    version: LATEST_PERSISTED_STATE_VERSION,
     accounts: [],
-    categories: [],
+    categories: [...categories, ...inferredCategories],
     transactions: [],
     budgets: [],
     recurringRules: [],
@@ -151,6 +185,32 @@ describe("app store", () => {
     });
   });
 
+  it("rejects invalid account updates before committing state", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-1",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().updateAccount("acct-1", {
+      creditLimitCents: 1000,
+    });
+
+    expect(useAppStore.getState().accounts[0]).not.toHaveProperty("creditLimitCents");
+    expect(warnSpy).toHaveBeenCalledWith(
+      "rejecting invalid store update",
+      expect.objectContaining({ action: "updateAccount" })
+    );
+  });
+
   it("creates an account opening-balance transaction and keeps exactly one per account", async () => {
     const persisted = createPersistedState({
       accounts: [
@@ -207,6 +267,21 @@ describe("app store", () => {
     useAppStore.getState().deleteAccountOpeningBalance("acct-1");
 
     expect(useAppStore.getState().transactions).toEqual([]);
+  });
+
+  it("rejects opening-balance updates for missing accounts", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { useAppStore } = await loadStore(createPersistedState());
+
+    useAppStore
+      .getState()
+      .upsertAccountOpeningBalance("acct-missing", 15000, "2026-04-01");
+
+    expect(useAppStore.getState().transactions).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "rejecting invalid store update",
+      expect.objectContaining({ action: "upsertAccountOpeningBalance" })
+    );
   });
 
   it("deletes account-linked transactions including opening balances", async () => {
@@ -337,6 +412,22 @@ describe("app store", () => {
 
   it("blocks duplicate budgets for the same month and category", async () => {
     const persisted = createPersistedState({
+      categories: [
+        {
+          id: "cat-food",
+          name: "food",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "cat-rent",
+          name: "rent",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
       budgets: [
         {
           id: "budget-1",
@@ -382,6 +473,65 @@ describe("app store", () => {
     const saved = JSON.parse(localStorage.getItem(storagekey) ?? "null") as PersistedState;
 
     expect(saved.budgets).toHaveLength(2);
+  });
+
+  it("rejects account deletion when it would orphan a transfer pair", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-checking",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "acct-savings",
+          name: "savings",
+          type: "savings",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-transfer-out",
+          kind: "transfer",
+          date: "2026-04-10",
+          amountCents: -2500,
+          accountId: "acct-checking",
+          source: "manual",
+          transferGroupId: "transfer-1",
+          createdAt: "2026-04-10T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+        {
+          id: "txn-transfer-in",
+          kind: "transfer",
+          date: "2026-04-10",
+          amountCents: 2500,
+          accountId: "acct-savings",
+          source: "manual",
+          transferGroupId: "transfer-1",
+          createdAt: "2026-04-10T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().deleteAccount("acct-checking");
+
+    expect(useAppStore.getState().accounts.map((account) => account.id)).toEqual([
+      "acct-checking",
+      "acct-savings",
+    ]);
+    expect(useAppStore.getState().transactions).toHaveLength(2);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "rejecting invalid store update",
+      expect.objectContaining({ action: "deleteAccount" })
+    );
   });
 
   it("generates recurring transactions once per month and keeps them sorted", async () => {
@@ -1061,5 +1211,337 @@ describe("app store", () => {
         note: "pair-safe",
       }),
     ]);
+  });
+
+  it("adds, updates, and deletes split transactions as single records", async () => {
+    const { useAppStore } = await loadStore(
+      createPersistedState({
+        categories: [
+          {
+            id: "cat-food",
+            name: "food",
+            kind: "expense",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+          {
+            id: "cat-home",
+            name: "home",
+            kind: "expense",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+          {
+            id: "cat-salary",
+            name: "salary",
+            kind: "income",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+        ],
+      })
+    );
+
+    useAppStore.getState().addTransaction({
+      id: "txn-split",
+      kind: "standard",
+      date: "2026-04-12",
+      amountCents: -3000,
+      accountId: "acct-checking",
+      merchant: "Warehouse",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -1200,
+          note: "produce",
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-home",
+          amountCents: -1800,
+          note: "supplies",
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-12T00:00:00.000Z",
+      updatedAt: "2026-04-12T00:00:00.000Z",
+    });
+
+    expect(useAppStore.getState().transactions).toHaveLength(1);
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      id: "txn-split",
+      splits: [
+        expect.objectContaining({ categoryId: "cat-food", amountCents: -1200 }),
+        expect.objectContaining({ categoryId: "cat-home", amountCents: -1800 }),
+      ],
+    });
+    expect(useAppStore.getState().transactions[0]).not.toHaveProperty("categoryId");
+
+    useAppStore.getState().updateTransaction("txn-split", {
+      amountCents: -3500,
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -2000,
+          note: "produce",
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-home",
+          amountCents: -1500,
+          note: "supplies",
+        },
+      ],
+    });
+
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      amountCents: -3500,
+      updatedAt: "2026-04-21T12:34:56.000Z",
+      splits: [
+        expect.objectContaining({ amountCents: -2000 }),
+        expect.objectContaining({ amountCents: -1500 }),
+      ],
+    });
+
+    useAppStore.getState().updateTransaction("txn-split", {
+      categoryId: "cat-food",
+      splits: undefined,
+      amountCents: -3500,
+    });
+
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      amountCents: -3500,
+      categoryId: "cat-food",
+    });
+    expect(useAppStore.getState().transactions[0]).not.toHaveProperty("splits");
+
+    useAppStore.getState().deleteTransaction("txn-split");
+
+    expect(useAppStore.getState().transactions).toEqual([]);
+  });
+
+  it("rejects invalid split category-kind combinations before committing state", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const persisted = createPersistedState({
+      categories: [
+        {
+          id: "cat-food",
+          name: "food",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "cat-home",
+          name: "home",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-split",
+          kind: "standard",
+          date: "2026-04-12",
+          amountCents: -3000,
+          accountId: "acct-checking",
+          splits: [
+            {
+              id: "split-1",
+              categoryId: "cat-food",
+              amountCents: -1200,
+            },
+            {
+              id: "split-2",
+              categoryId: "cat-home",
+              amountCents: -1800,
+            },
+          ],
+          source: "manual",
+          createdAt: "2026-04-12T00:00:00.000Z",
+          updatedAt: "2026-04-12T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().updateCategory("cat-food", {
+      kind: "income",
+    });
+
+    expect(useAppStore.getState().categories.find((category) => category.id === "cat-food"))
+      .toMatchObject({ kind: "expense" });
+    expect(warnSpy).toHaveBeenCalledWith(
+      "rejecting invalid store update",
+      expect.objectContaining({ action: "updateCategory" })
+    );
+  });
+
+  it("rejects invalid transaction updates and keeps the previous transaction intact", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const persisted = createPersistedState({
+      categories: [
+        {
+          id: "cat-food",
+          name: "food",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "cat-home",
+          name: "home",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-standard",
+          kind: "standard",
+          date: "2026-04-12",
+          amountCents: -3000,
+          accountId: "acct-checking",
+          categoryId: "cat-food",
+          source: "manual",
+          createdAt: "2026-04-12T00:00:00.000Z",
+          updatedAt: "2026-04-12T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().updateTransaction("txn-standard", {
+      amountCents: -3000,
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -1500,
+        },
+      ],
+    });
+
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      id: "txn-standard",
+      categoryId: "cat-food",
+      amountCents: -3000,
+    });
+    expect(useAppStore.getState().transactions[0]).not.toHaveProperty("splits");
+    expect(warnSpy).toHaveBeenCalledWith(
+      "rejecting invalid store update",
+      expect.objectContaining({ action: "updateTransaction" })
+    );
+  });
+
+  it("rejects category deletion that would leave split references behind", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const persisted = createPersistedState({
+      categories: [
+        {
+          id: "cat-food",
+          name: "food",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "cat-home",
+          name: "home",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-split",
+          kind: "standard",
+          date: "2026-04-12",
+          amountCents: -3000,
+          accountId: "acct-checking",
+          splits: [
+            {
+              id: "split-1",
+              categoryId: "cat-food",
+              amountCents: -1200,
+            },
+            {
+              id: "split-2",
+              categoryId: "cat-home",
+              amountCents: -1800,
+            },
+          ],
+          source: "manual",
+          createdAt: "2026-04-12T00:00:00.000Z",
+          updatedAt: "2026-04-12T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().deleteCategory("cat-food");
+
+    expect(useAppStore.getState().categories.map((category) => category.id)).toEqual([
+      "cat-food",
+      "cat-home",
+    ]);
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      id: "txn-split",
+      splits: [
+        expect.objectContaining({ categoryId: "cat-food" }),
+        expect.objectContaining({ categoryId: "cat-home" }),
+      ],
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      "rejecting invalid store update",
+      expect.objectContaining({ action: "deleteCategory" })
+    );
+  });
+
+  it("archives and restores categories without removing referenced history", async () => {
+    const persisted = createPersistedState({
+      categories: [
+        {
+          id: "cat-food",
+          name: "food",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-standard",
+          kind: "standard",
+          date: "2026-04-12",
+          amountCents: -3000,
+          accountId: "acct-checking",
+          categoryId: "cat-food",
+          source: "manual",
+          createdAt: "2026-04-12T00:00:00.000Z",
+          updatedAt: "2026-04-12T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    useAppStore.getState().archiveCategory("cat-food");
+
+    expect(useAppStore.getState().categories[0]).toMatchObject({
+      id: "cat-food",
+      archivedAt: "2026-04-21T12:34:56.000Z",
+    });
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      categoryId: "cat-food",
+    });
+
+    useAppStore.getState().unarchiveCategory("cat-food");
+
+    expect(useAppStore.getState().categories[0]).not.toHaveProperty("archivedAt");
   });
 });

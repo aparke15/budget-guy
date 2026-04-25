@@ -22,8 +22,16 @@ export type Category = {
   name: string;
   kind: CategoryKind;
   color?: string;
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type TransactionSplit = {
+  id: string;
+  categoryId: string;
+  amountCents: number;
+  note?: string;
 };
 
 export type Transaction = {
@@ -32,7 +40,8 @@ export type Transaction = {
   date: string; // yyyy-mm-dd
   amountCents: number;
   accountId: string;
-  categoryId?: string; // required for standard, omitted for transfer/opening-balance
+  categoryId?: string; // single-category standard only, omitted for split/transfer/opening-balance
+  splits?: TransactionSplit[]; // standard only, category allocations for reporting/budgeting
   merchant?: string;
   note?: string;
   source: "manual" | "recurring";
@@ -121,11 +130,39 @@ export type RecurringGenerationSummary = {
   ruleResults: RecurringGenerationRuleSummary[];
 };
 
-export type PersistedState = {
-  version: 1;
+export const PERSISTED_STATE_V1_VERSION = 1;
+
+export const PERSISTED_STATE_V2_VERSION = 2;
+
+export const PERSISTED_STATE_V3_VERSION = 3;
+
+export const LATEST_PERSISTED_STATE_VERSION = PERSISTED_STATE_V3_VERSION;
+
+export type PersistedStateCollections = {
   accounts: Account[];
   categories: Category[];
   transactions: Transaction[];
   budgets: Budget[];
   recurringRules: RecurringRule[];
 };
+
+export type PersistedStateV1 = PersistedStateCollections & {
+  version: typeof PERSISTED_STATE_V1_VERSION;
+};
+
+export type PersistedStateV2 = PersistedStateCollections & {
+  version: typeof PERSISTED_STATE_V2_VERSION;
+};
+
+export type PersistedStateV3 = PersistedStateCollections & {
+  version: typeof PERSISTED_STATE_V3_VERSION;
+};
+
+export type VersionedPersistedState =
+  | PersistedStateV1
+  | PersistedStateV2
+  | PersistedStateV3;
+
+export type LatestPersistedState = PersistedStateV3;
+
+export type PersistedState = LatestPersistedState;

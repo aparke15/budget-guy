@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { LATEST_PERSISTED_STATE_VERSION } from "../types";
+
 export const accountSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -22,8 +24,24 @@ export const categorySchema = z.object({
   name: z.string().min(1),
   kind: z.enum(["income", "expense"]),
   color: z.string().optional(),
+  archivedAt: z.string().datetime().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+});
+
+export const transactionSplitSchema = z.object({
+  id: z.string().min(1),
+  categoryId: z.string().min(1),
+  amountCents: z.number().int(),
+  note: z.string().optional(),
+}).superRefine((split, ctx) => {
+  if (split.amountCents === 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["amountCents"],
+      message: "split rows require a non-zero amount",
+    });
+  }
 });
 
 export const transactionSchema = z.object({
@@ -33,6 +51,7 @@ export const transactionSchema = z.object({
   amountCents: z.number().int(),
   accountId: z.string().min(1),
   categoryId: z.string().min(1).optional(),
+  splits: z.array(transactionSplitSchema).optional(),
   merchant: z.string().optional(),
   note: z.string().optional(),
   source: z.enum(["manual", "recurring"]),
@@ -42,12 +61,67 @@ export const transactionSchema = z.object({
   updatedAt: z.string().datetime(),
 }).superRefine((transaction, ctx) => {
   if (transaction.kind === "standard") {
-    if (!transaction.categoryId) {
+    const splits = transaction.splits;
+    const hasSplits = splits != null;
+
+    if (hasSplits && splits.length < 2) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["splits"],
+        message: "split transactions require at least 2 rows",
+      });
+    }
+
+    if (hasSplits && transaction.amountCents === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["amountCents"],
+        message: "split transactions require a non-zero amount",
+      });
+    }
+
+    if (hasSplits && transaction.categoryId != null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["categoryId"],
+        message: "split transactions cannot include parent categoryId",
+      });
+    }
+
+    if (!hasSplits && !transaction.categoryId) {
       ctx.addIssue({
         code: "custom",
         path: ["categoryId"],
         message: "standard transactions require categoryId",
       });
+    }
+
+    if (hasSplits) {
+      const splitTotalAmountCents = splits.reduce(
+        (sum, split) => sum + split.amountCents,
+        0
+      );
+
+      if (splitTotalAmountCents !== transaction.amountCents) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["splits"],
+          message: "split transaction amounts must add up to the parent amount",
+        });
+      }
+
+      const parentSign = Math.sign(transaction.amountCents);
+
+      if (
+        parentSign !== 0 &&
+        splits.some((split) => Math.sign(split.amountCents) !== parentSign)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["splits"],
+          message: "split amounts must use the same sign as the parent transaction",
+        });
+      }
     }
 
     if (transaction.transferGroupId != null) {
@@ -75,6 +149,14 @@ export const transactionSchema = z.object({
         code: "custom",
         path: ["transferGroupId"],
         message: "opening-balance transactions cannot include transferGroupId",
+      });
+    }
+
+    if (transaction.splits != null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["splits"],
+        message: "opening-balance transactions cannot include splits",
       });
     }
 
@@ -118,6 +200,14 @@ export const transactionSchema = z.object({
       code: "custom",
       path: ["categoryId"],
       message: "transfer transactions cannot include categoryId",
+    });
+  }
+
+  if (transaction.splits != null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["splits"],
+      message: "transfer transactions cannot include splits",
     });
   }
 
@@ -272,14 +362,22 @@ export const recurringRuleSchema = z
     }
   });
 
-export const persistedStateSchema = z.object({
-  version: z.literal(1),
+const persistedCollectionsShape = {
   accounts: z.array(accountSchema),
   categories: z.array(categorySchema),
   transactions: z.array(transactionSchema),
   budgets: z.array(budgetSchema),
   recurringRules: z.array(recurringRuleSchema),
-}).superRefine((state, ctx) => {
+};
+
+function addPersistedStateRefinements<
+  TSchema extends z.ZodObject<typeof persistedCollectionsShape>
+>(schema: TSchema) {
+  return schema.superRefine((state, ctx) => {
+  const categoryIds = new Set(state.categories.map((category) => category.id));
+  const categoryKindById = new Map(
+    state.categories.map((category) => [category.id, category.kind])
+  );
   const transferGroups = new Map<string, typeof state.transactions>();
 
   for (const transaction of state.transactions) {
@@ -366,7 +464,99 @@ export const persistedStateSchema = z.object({
       message: `account ${accountId} cannot have more than one opening-balance transaction`,
     });
   }
-});
+
+  for (const budget of state.budgets) {
+    if (!categoryIds.has(budget.categoryId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["budgets"],
+        message: `budget category ${budget.categoryId} must exist`,
+      });
+    }
+  }
+
+  for (const rule of state.recurringRules) {
+    if (rule.categoryId && !categoryIds.has(rule.categoryId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["recurringRules"],
+        message: `recurring rule category ${rule.categoryId} must exist`,
+      });
+    }
+  }
+
+  for (const transaction of state.transactions) {
+    if (transaction.kind !== "standard") {
+      continue;
+    }
+
+    if (transaction.categoryId && !categoryIds.has(transaction.categoryId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["transactions"],
+        message: `transaction category ${transaction.categoryId} must exist`,
+      });
+    }
+
+    if (transaction.splits == null) {
+      if (transaction.categoryId) {
+        const categoryKind = categoryKindById.get(transaction.categoryId);
+        const expectedCategoryKind = transaction.amountCents < 0 ? "expense" : "income";
+
+        if (
+          transaction.amountCents !== 0 &&
+          categoryKind &&
+          categoryKind !== expectedCategoryKind
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["transactions"],
+            message: `transaction category ${transaction.categoryId} must be a ${expectedCategoryKind} category`,
+          });
+        }
+      }
+
+      continue;
+    }
+
+    const expectedCategoryKind = transaction.amountCents < 0 ? "expense" : "income";
+
+    for (const split of transaction.splits) {
+      if (!categoryIds.has(split.categoryId)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["transactions"],
+          message: `split category ${split.categoryId} must exist`,
+        });
+        continue;
+      }
+
+      const categoryKind = categoryKindById.get(split.categoryId);
+
+      if (categoryKind && categoryKind !== expectedCategoryKind) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["transactions"],
+          message: `split category ${split.categoryId} must be a ${expectedCategoryKind} category`,
+        });
+      }
+    }
+  }
+  });
+}
+
+export const persistedCollectionsSchema = addPersistedStateRefinements(
+  z.object(persistedCollectionsShape)
+);
+
+export const latestPersistedStateSchema = addPersistedStateRefinements(
+  z.object({
+    version: z.literal(LATEST_PERSISTED_STATE_VERSION),
+    ...persistedCollectionsShape,
+  })
+);
+
+export const persistedStateSchema = latestPersistedStateSchema;
 
 export type AccountSchemaType = z.infer<typeof accountSchema>;
 export type CategorySchemaType = z.infer<typeof categorySchema>;
@@ -374,3 +564,5 @@ export type TransactionSchemaType = z.infer<typeof transactionSchema>;
 export type BudgetSchemaType = z.infer<typeof budgetSchema>;
 export type RecurringRuleSchemaType = z.infer<typeof recurringRuleSchema>;
 export type PersistedStateSchemaType = z.infer<typeof persistedStateSchema>;
+export type PersistedCollectionsSchemaType = z.infer<typeof persistedCollectionsSchema>;
+export type LatestPersistedStateSchemaType = z.infer<typeof latestPersistedStateSchema>;

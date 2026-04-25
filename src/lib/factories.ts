@@ -1,3 +1,4 @@
+import { getActiveCategories } from "./categories";
 import { getNowIso } from "./dates";
 import { makeId } from "./ids";
 import {
@@ -19,6 +20,7 @@ import type {
   RecurringRuleKind,
   RecurringRule,
   Transaction,
+  TransactionSplit,
 } from "../types";
 
 type CreateTransactionParams = {
@@ -96,7 +98,9 @@ function getDefaultCategoryId(
   categories: Category[],
   kind: CategoryKind
 ): string {
-  return categories.find((category) => category.kind === kind)?.id ?? "";
+  const activeCategories = getActiveCategories(categories);
+
+  return activeCategories.find((category) => category.kind === kind)?.id ?? "";
 }
 
 function getDefaultAccountId(accounts: Account[]): string {
@@ -105,6 +109,71 @@ function getDefaultAccountId(accounts: Account[]): string {
 
 function getDefaultTransferDestinationAccountId(accounts: Account[]): string {
   return accounts[1]?.id ?? accounts[0]?.id ?? "";
+}
+
+function createEmptyTransactionFormSplits(
+  categoryId: string
+): TransactionFormValues["splits"] {
+  return [0, 1].map(() => ({
+    id: makeId("split"),
+    categoryId,
+    amount: "",
+    note: "",
+  }));
+}
+
+function getPersistedSplitAmountCents(
+  amount: string,
+  entryType: Exclude<TransactionFormValues["entryType"], "transfer">
+): number {
+  const parsedAmountCents = parseAmountInputToCents(amount);
+
+  if (parsedAmountCents == null || parsedAmountCents <= 0) {
+    throw new Error("split amounts must be positive numbers");
+  }
+
+  return entryType === "income"
+    ? Math.abs(parsedAmountCents)
+    : -Math.abs(parsedAmountCents);
+}
+
+function createTransactionSplits(
+  values: TransactionFormValues,
+  amountCents: number
+): TransactionSplit[] {
+  if (values.entryType === "transfer") {
+    throw new Error("transfer entries cannot include splits");
+  }
+
+  const entryType = values.entryType;
+
+  if (values.splits.length < 2) {
+    throw new Error("split transactions require at least 2 rows");
+  }
+
+  const splits = values.splits.map((split) => {
+    if (!split.categoryId) {
+      throw new Error("each split row requires a category");
+    }
+
+    return {
+      id: split.id || makeId("split"),
+      categoryId: split.categoryId,
+      amountCents: getPersistedSplitAmountCents(split.amount, entryType),
+      note: split.note.trim() || undefined,
+    } satisfies TransactionSplit;
+  });
+
+  const totalSplitAmountCents = splits.reduce(
+    (sum, split) => sum + split.amountCents,
+    0
+  );
+
+  if (totalSplitAmountCents !== amountCents) {
+    throw new Error("split amounts must add up to the transaction total");
+  }
+
+  return splits;
 }
 
 export function getDefaultRecurringTransferAccountId(
@@ -123,15 +192,29 @@ export function createTransactionFormValues(
   categories: Category[],
   initialState?: TransactionFormInitialState
 ): TransactionFormValues {
+  const defaultExpenseCategoryId = getDefaultCategoryId(categories, "expense");
+
   if (initialState?.mode === "standard") {
     const { transaction: existing } = initialState;
+    const splitCategoryId =
+      existing.splits?.[0]?.categoryId ??
+      existing.categoryId ??
+      defaultExpenseCategoryId;
 
     return {
       date: existing.date,
       entryType: existing.amountCents >= 0 ? "income" : "expense",
       amount: formatCentsForInput(existing.amountCents),
       accountId: existing.accountId,
-      categoryId: existing.categoryId ?? getDefaultCategoryId(categories, "expense"),
+      categoryId: existing.categoryId ?? splitCategoryId,
+      isSplit: Boolean(existing.splits?.length),
+      splits:
+        existing.splits?.map((split) => ({
+          id: split.id,
+          categoryId: split.categoryId,
+          amount: formatCentsForInput(split.amountCents),
+          note: split.note ?? "",
+        })) ?? createEmptyTransactionFormSplits(splitCategoryId),
       merchant: existing.merchant ?? "",
       note: existing.note ?? "",
       fromAccountId: getDefaultAccountId(accounts),
@@ -145,7 +228,9 @@ export function createTransactionFormValues(
       entryType: "transfer",
       amount: formatCentsForInput(initialState.amountCents),
       accountId: getDefaultAccountId(accounts),
-      categoryId: getDefaultCategoryId(categories, "expense"),
+      categoryId: defaultExpenseCategoryId,
+      isSplit: false,
+      splits: createEmptyTransactionFormSplits(defaultExpenseCategoryId),
       merchant: "",
       note: initialState.note ?? "",
       fromAccountId: initialState.fromAccountId,
@@ -158,7 +243,9 @@ export function createTransactionFormValues(
     entryType: "expense",
     amount: "",
     accountId: getDefaultAccountId(accounts),
-    categoryId: getDefaultCategoryId(categories, "expense"),
+    categoryId: defaultExpenseCategoryId,
+    isSplit: false,
+    splits: createEmptyTransactionFormSplits(defaultExpenseCategoryId),
     merchant: "",
     note: "",
     fromAccountId: getDefaultAccountId(accounts),
@@ -170,6 +257,11 @@ export function createTransaction(
   params: CreateTransactionParams
 ): Transaction {
   const { values, existing } = params;
+
+  if (values.entryType === "transfer") {
+    throw new Error("transfer entries must use the transfer factory");
+  }
+
   const amountAbsCents = parseAmountInputToCents(values.amount);
 
   if (amountAbsCents == null || amountAbsCents <= 0) {
@@ -181,6 +273,7 @@ export function createTransaction(
     values.entryType === "income"
       ? Math.abs(amountAbsCents)
       : -Math.abs(amountAbsCents);
+  const splits = values.isSplit ? createTransactionSplits(values, amountCents) : undefined;
 
   return {
     id: existing?.id ?? makeId("txn"),
@@ -188,7 +281,8 @@ export function createTransaction(
     date: values.date,
     amountCents,
     accountId: values.accountId,
-    categoryId: values.categoryId,
+    categoryId: splits ? undefined : values.categoryId,
+    splits,
     merchant: values.merchant.trim() || undefined,
     note: values.note.trim() || undefined,
     source: existing?.source ?? "manual",

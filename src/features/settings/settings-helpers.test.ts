@@ -214,9 +214,54 @@ describe("settings helpers", () => {
     expect(
       buildDeleteImpact(pendingDelete, budgets, transactions, recurringRules)
     ).toEqual({
-      title: "delete category: rent",
+      title: "archive category: rent",
       description:
-        "this will remove 1 budget, 2 transactions, and 1 recurring rule.",
+        "this keeps 2 transactions, 1 budget, and 1 recurring rule in history, but removes the category from new-use pickers until restored.",
+    });
+  });
+
+  it("counts split transaction references in category delete impact", () => {
+    const pendingDelete: PendingDelete = {
+      entity: "category",
+      id: "cat-split",
+      name: "groceries",
+    };
+
+    expect(
+      buildDeleteImpact(
+        pendingDelete,
+        budgets,
+        [
+          ...transactions,
+          {
+            id: "txn-split",
+            kind: "standard",
+            date: "2026-04-20",
+            amountCents: -3000,
+            accountId: "acct-1",
+            splits: [
+              {
+                id: "split-1",
+                categoryId: "cat-split",
+                amountCents: -1200,
+              },
+              {
+                id: "split-2",
+                categoryId: "cat-1",
+                amountCents: -1800,
+              },
+            ],
+            source: "manual",
+            createdAt: "2026-04-20T00:00:00.000Z",
+            updatedAt: "2026-04-20T00:00:00.000Z",
+          },
+        ],
+        recurringRules
+      )
+    ).toEqual({
+      title: "archive category: groceries",
+      description:
+        "this keeps 1 transaction, 0 budgets, and 0 recurring rules in history, but removes the category from new-use pickers until restored.",
     });
   });
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useAppStore } from "../../app/store";
+import { getVisibleBudgetCategories } from "../../lib/categories";
 import { createBudget } from "../../lib/factories";
 import { getCurrentMonth } from "../../lib/dates";
 import {
@@ -33,8 +34,8 @@ export function BudgetPage() {
   const updateBudget = useAppStore((state) => state.updateBudget);
 
   const expenseCategories = useMemo(
-    () => categories.filter((category) => category.kind === "expense"),
-    [categories]
+    () => getVisibleBudgetCategories(categories, budgets, transactions, month),
+    [budgets, categories, month, transactions]
   );
 
   const rows = useMemo(

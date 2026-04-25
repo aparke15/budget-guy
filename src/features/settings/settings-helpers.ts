@@ -1,4 +1,5 @@
 import { formatSignedCentsForInput, parseAmountInputToCents } from "../../lib/money";
+import { countTransactionsReferencingCategory } from "../../lib/transaction-splits";
 import type { AccountFormValues } from "../types";
 import type { Account, Budget, RecurringRule, Transaction } from "../../types";
 
@@ -182,16 +183,17 @@ export function buildDeleteImpact(
     const budgetCount = budgets.filter(
       (budget) => budget.categoryId === pendingDelete.id
     ).length;
-    const transactionCount = transactions.filter(
-      (transaction) => transaction.categoryId === pendingDelete.id
-    ).length;
+    const transactionCount = countTransactionsReferencingCategory(
+      transactions,
+      pendingDelete.id
+    );
     const ruleCount = recurringRules.filter(
       (rule) => rule.categoryId === pendingDelete.id
     ).length;
 
     return {
-      title: `delete category: ${pendingDelete.name}`,
-      description: `this will remove ${budgetCount} budget${budgetCount === 1 ? "" : "s"}, ${transactionCount} transaction${transactionCount === 1 ? "" : "s"}, and ${ruleCount} recurring rule${ruleCount === 1 ? "" : "s"}.`,
+      title: `archive category: ${pendingDelete.name}`,
+      description: `this keeps ${transactionCount} transaction${transactionCount === 1 ? "" : "s"}, ${budgetCount} budget${budgetCount === 1 ? "" : "s"}, and ${ruleCount} recurring rule${ruleCount === 1 ? "" : "s"} in history, but removes the category from new-use pickers until restored.`,
     };
   }
 

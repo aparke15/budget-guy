@@ -1,4 +1,5 @@
 import type { Budget, BudgetRow, Category, MonthlySummary, Transaction } from "../../types";
+import { getCategoryDisplayName } from "../../lib/categories";
 import { parseAmountInputToCents, sumCategoryActualCents } from "../../lib/money";
 
 export type BudgetEditorRow = BudgetRow & {
@@ -51,7 +52,7 @@ export function getBudgetEditorRows(
       return {
         budgetId: budget?.id,
         categoryId: category.id,
-        categoryName: category.name,
+        categoryName: getCategoryDisplayName(category),
         plannedCents,
         actualCents,
         remainingCents,

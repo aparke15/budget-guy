@@ -80,6 +80,25 @@ describe("filterTransactions", () => {
       note: "Monthly rent",
     }),
     createTransaction({
+      id: "txn-split",
+      categoryId: undefined,
+      merchant: "Warehouse",
+      note: "Bulk run",
+      amountCents: -3000,
+      splits: [
+        {
+          id: "split-food",
+          categoryId: "cat-groceries",
+          amountCents: -1500,
+        },
+        {
+          id: "split-rent",
+          categoryId: "cat-rent",
+          amountCents: -1500,
+        },
+      ],
+    }),
+    createTransaction({
       id: "txn-note-match",
       merchant: "Unknown",
       note: "Reimbursement from Sam",
@@ -122,6 +141,7 @@ describe("filterTransactions", () => {
       "txn-month-match",
       "txn-other-account",
       "txn-other-category",
+      "txn-split",
       "txn-note-match",
       "transfer-1",
       "txn-opening-balance",
@@ -143,7 +163,7 @@ describe("filterTransactions", () => {
       createFilters({ categoryId: "cat-rent" })
     );
 
-    expect(result.map((row) => row.id)).toEqual(["txn-other-category"]);
+    expect(result.map((row) => row.id)).toEqual(["txn-other-category", "txn-split"]);
   });
 
   it("searches by merchant", () => {
@@ -196,6 +216,7 @@ describe("filterTransactions", () => {
       "txn-month-match",
       "txn-other-account",
       "txn-other-category",
+      "txn-split",
       "txn-note-match",
       "transfer-1",
       "txn-opening-balance",
@@ -212,6 +233,7 @@ describe("filterTransactions", () => {
       "txn-month-match",
       "txn-other-account",
       "txn-other-category",
+      "txn-split",
       "txn-note-match",
       "transfer-1",
       "txn-opening-balance",

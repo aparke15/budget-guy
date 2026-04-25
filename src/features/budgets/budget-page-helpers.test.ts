@@ -170,6 +170,60 @@ describe("budget page helpers", () => {
     ]);
   });
 
+  it("includes split allocations in category actuals", () => {
+    expect(
+      getBudgetEditorRows(
+        categories.filter((item) => item.kind === "expense"),
+        budgets,
+        [
+          ...transactions,
+          {
+            id: "txn-split",
+            kind: "standard",
+            date: "2026-04-10",
+            amountCents: -3000,
+            accountId: "acct-1",
+            splits: [
+              {
+                id: "split-rent",
+                categoryId: "cat-rent",
+                amountCents: -1000,
+              },
+              {
+                id: "split-food",
+                categoryId: "cat-food",
+                amountCents: -2000,
+              },
+            ],
+            source: "manual",
+            createdAt: "2026-04-10T00:00:00.000Z",
+            updatedAt: "2026-04-10T00:00:00.000Z",
+          },
+        ],
+        "2026-04"
+      )
+    ).toEqual([
+      {
+        budgetId: "budget-food",
+        categoryId: "cat-food",
+        categoryName: "Food",
+        plannedCents: 25000,
+        actualCents: 6500,
+        remainingCents: 18500,
+        overBudget: false,
+      },
+      {
+        budgetId: "budget-rent",
+        categoryId: "cat-rent",
+        categoryName: "Rent",
+        plannedCents: 120000,
+        actualCents: 121000,
+        remainingCents: -1000,
+        overBudget: true,
+      },
+    ]);
+  });
+
   it("detects duplicate budgets for a month and category", () => {
     expect(hasBudgetForMonthCategory(budgets, "2026-04", "cat-rent")).toBe(true);
     expect(hasBudgetForMonthCategory(budgets, "2026-04", "cat-salary")).toBe(false);

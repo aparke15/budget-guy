@@ -56,9 +56,46 @@ describe("factory helpers", () => {
     expect(values.accountId).toBe("acct-checking");
     expect(values.categoryId).toBe("cat-food");
     expect(values.entryType).toBe("expense");
+    expect(values.isSplit).toBe(false);
+    expect(values.splits).toHaveLength(2);
+    expect(values.splits[0]).toMatchObject({
+      categoryId: "cat-food",
+      amount: "",
+      note: "",
+    });
     expect(values.date).toBe("2026-04-21");
     expect(values.fromAccountId).toBe("acct-checking");
     expect(values.toAccountId).toBe("acct-checking");
+  });
+
+  it("excludes archived categories from new transaction defaults", () => {
+    const values = createTransactionFormValues(accounts, [
+      {
+        id: "cat-old-food",
+        name: "Old Food",
+        kind: "expense",
+        archivedAt: "2026-04-10T00:00:00.000Z",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-04-10T00:00:00.000Z",
+      },
+      {
+        id: "cat-food",
+        name: "Food",
+        kind: "expense",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "cat-salary",
+        name: "Salary",
+        kind: "income",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+
+    expect(values.categoryId).toBe("cat-food");
+    expect(values.splits[0]?.categoryId).toBe("cat-food");
   });
 
   it("maps an existing transaction into editable form values", () => {
@@ -87,11 +124,174 @@ describe("factory helpers", () => {
       amount: "123.45",
       accountId: "acct-checking",
       categoryId: "cat-food",
+      isSplit: false,
+      splits: expect.arrayContaining([
+        expect.objectContaining({
+          categoryId: "cat-food",
+          amount: "",
+          note: "",
+        }),
+      ]),
       merchant: "Coffee Shop",
       note: "Morning",
       fromAccountId: "acct-checking",
       toAccountId: "acct-checking",
     });
+  });
+
+  it("preserves an archived category when editing an existing transaction", () => {
+    const existing: Transaction = {
+      id: "txn-1",
+      kind: "standard",
+      date: "2026-04-10",
+      amountCents: -12345,
+      accountId: "acct-checking",
+      categoryId: "cat-old-food",
+      merchant: "Coffee Shop",
+      note: "Morning",
+      source: "manual",
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-10T00:00:00.000Z",
+    };
+
+    const archivedCategories: Category[] = [
+      {
+        id: "cat-old-food",
+        name: "Old Food",
+        kind: "expense",
+        archivedAt: "2026-04-11T00:00:00.000Z",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-04-11T00:00:00.000Z",
+      },
+      ...categories,
+    ];
+
+    expect(
+      createTransactionFormValues(accounts, archivedCategories, {
+        mode: "standard",
+        transaction: existing,
+      }).categoryId
+    ).toBe("cat-old-food");
+  });
+
+  it("maps an existing split transaction into editable form values", () => {
+    const existing: Transaction = {
+      id: "txn-split",
+      kind: "standard",
+      date: "2026-04-10",
+      amountCents: -12345,
+      accountId: "acct-checking",
+      merchant: "Grocer",
+      note: "Weekly run",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -10000,
+          note: "meal prep",
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-food",
+          amountCents: -2345,
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-10T00:00:00.000Z",
+    };
+
+    expect(
+      createTransactionFormValues(accounts, categories, {
+        mode: "standard",
+        transaction: existing,
+      })
+    ).toEqual({
+      date: "2026-04-10",
+      entryType: "expense",
+      amount: "123.45",
+      accountId: "acct-checking",
+      categoryId: "cat-food",
+      isSplit: true,
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amount: "100.00",
+          note: "meal prep",
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-food",
+          amount: "23.45",
+          note: "",
+        },
+      ],
+      merchant: "Grocer",
+      note: "Weekly run",
+      fromAccountId: "acct-checking",
+      toAccountId: "acct-checking",
+    });
+  });
+
+  it("preserves archived split categories when editing an existing split transaction", () => {
+    const existing: Transaction = {
+      id: "txn-split",
+      kind: "standard",
+      date: "2026-04-10",
+      amountCents: -12345,
+      accountId: "acct-checking",
+      merchant: "Grocer",
+      note: "Weekly run",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-old-food",
+          amountCents: -10000,
+          note: "meal prep",
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-food",
+          amountCents: -2345,
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-10T00:00:00.000Z",
+    };
+
+    const archivedCategories: Category[] = [
+      {
+        id: "cat-old-food",
+        name: "Old Food",
+        kind: "expense",
+        archivedAt: "2026-04-11T00:00:00.000Z",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-04-11T00:00:00.000Z",
+      },
+      ...categories,
+    ];
+
+    expect(
+      createTransactionFormValues(accounts, archivedCategories, {
+        mode: "standard",
+        transaction: existing,
+      }).splits
+    ).toEqual([
+      {
+        id: "split-1",
+        categoryId: "cat-old-food",
+        amount: "100.00",
+        note: "meal prep",
+      },
+      {
+        id: "split-2",
+        categoryId: "cat-food",
+        amount: "23.45",
+        note: "",
+      },
+    ]);
   });
 
   it("creates an expense transaction and trims optional text fields", () => {
@@ -102,6 +302,21 @@ describe("factory helpers", () => {
         amount: "123.45",
         accountId: "acct-checking",
         categoryId: "cat-food",
+        isSplit: false,
+        splits: [
+          {
+            id: "split-1",
+            categoryId: "cat-food",
+            amount: "",
+            note: "",
+          },
+          {
+            id: "split-2",
+            categoryId: "cat-food",
+            amount: "",
+            note: "",
+          },
+        ],
         merchant: "  Corner Store  ",
         note: "  snacks  ",
         fromAccountId: "acct-checking",
@@ -139,6 +354,21 @@ describe("factory helpers", () => {
         amount: "55.00",
         accountId: "acct-checking",
         categoryId: "cat-salary",
+        isSplit: false,
+        splits: [
+          {
+            id: "split-1",
+            categoryId: "cat-salary",
+            amount: "",
+            note: "",
+          },
+          {
+            id: "split-2",
+            categoryId: "cat-salary",
+            amount: "",
+            note: "",
+          },
+        ],
         merchant: "",
         note: "",
         fromAccountId: "acct-checking",
@@ -166,6 +396,21 @@ describe("factory helpers", () => {
           amount: "0",
           accountId: "acct-checking",
           categoryId: "cat-food",
+          isSplit: false,
+          splits: [
+            {
+              id: "split-1",
+              categoryId: "cat-food",
+              amount: "",
+              note: "",
+            },
+            {
+              id: "split-2",
+              categoryId: "cat-food",
+              amount: "",
+              note: "",
+            },
+          ],
           merchant: "",
           note: "",
           fromAccountId: "acct-checking",
@@ -192,6 +437,14 @@ describe("factory helpers", () => {
       amount: "25.00",
       accountId: "acct-checking",
       categoryId: "cat-food",
+      isSplit: false,
+      splits: expect.arrayContaining([
+        expect.objectContaining({
+          categoryId: "cat-food",
+          amount: "",
+          note: "",
+        }),
+      ]),
       merchant: "",
       note: "move",
       fromAccountId: "acct-checking",
@@ -239,6 +492,58 @@ describe("factory helpers", () => {
     expect(transaction).not.toHaveProperty("merchant");
     expect(transaction).not.toHaveProperty("recurringRuleId");
     expect(transaction).not.toHaveProperty("transferGroupId");
+  });
+
+  it("creates split transactions without a parent categoryId", () => {
+    const transaction = createTransaction({
+      values: {
+        date: "2026-04-21",
+        entryType: "expense",
+        amount: "123.45",
+        accountId: "acct-checking",
+        categoryId: "cat-food",
+        isSplit: true,
+        splits: [
+          {
+            id: "split-1",
+            categoryId: "cat-food",
+            amount: "100.00",
+            note: "groceries",
+          },
+          {
+            id: "split-2",
+            categoryId: "cat-food",
+            amount: "23.45",
+            note: "snacks",
+          },
+        ],
+        merchant: "Corner Store",
+        note: "weekend run",
+        fromAccountId: "acct-checking",
+        toAccountId: "acct-checking",
+      },
+    });
+
+    expect(transaction).toMatchObject({
+      kind: "standard",
+      amountCents: -12345,
+      accountId: "acct-checking",
+      categoryId: undefined,
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-food",
+          amountCents: -10000,
+          note: "groceries",
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-food",
+          amountCents: -2345,
+          note: "snacks",
+        },
+      ],
+    });
   });
 
   it("creates trimmed account, category, budget, and recurring rule records", () => {

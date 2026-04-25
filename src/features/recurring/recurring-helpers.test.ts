@@ -236,6 +236,53 @@ describe("recurring helpers", () => {
     expect(switched.merchant).toBe("");
   });
 
+  it("defaults new recurring rules to active categories and keeps an archived selected category on edit", () => {
+    const archivedCategories: Category[] = [
+      {
+        id: "cat-archived",
+        name: "Old Rent",
+        kind: "expense",
+        archivedAt: "2026-04-10T00:00:00.000Z",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-04-10T00:00:00.000Z",
+      },
+      {
+        id: "cat-active",
+        name: "Groceries",
+        kind: "expense",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+
+    expect(createRecurringRuleFormValues(accounts, archivedCategories).categoryId).toBe(
+      "cat-active"
+    );
+
+    expect(
+      ensureRecurringFormReferences(
+        {
+          kind: "standard",
+          name: "",
+          amount: "",
+          accountId: "acct-checking",
+          toAccountId: "acct-savings",
+          categoryId: "cat-archived",
+          frequency: "monthly",
+          startDate: "2026-04-21",
+          endDate: "",
+          active: true,
+          dayOfMonth: "21",
+          dayOfWeek: "2",
+          merchant: "",
+          note: "",
+        },
+        accounts,
+        archivedCategories
+      ).categoryId
+    ).toBe("cat-archived");
+  });
+
   it("clears schedule-only fields when switching to yearly frequency", () => {
     const existing: RecurringRule = {
       id: "rule-yearly",
