@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { loadOrCreatePersistedState } from "../../app/storage";
 import type { PersistedState } from "../../types";
 
 const storageKey = "budget-mvp";
@@ -68,6 +69,7 @@ async function loadAccountsPage(initialState?: PersistedState) {
     import("./accounts-page"),
     import("../../app/store"),
   ]);
+  storeModule.initializeAppStore(loadOrCreatePersistedState());
 
   return {
     AccountsPage,

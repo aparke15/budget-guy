@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { useAppStore } from "../../app/store";
+import { generateRecurringForRange } from "../../app/recurring-store-actions";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents, getBudgetRows, getMonthlySummary } from "../../lib/money";
 import { hasTransactionSplits } from "../../lib/transaction-splits";
@@ -35,9 +36,6 @@ export function DashboardPage() {
   const budgets = useAppStore((state) => state.budgets);
   const categories = useAppStore((state) => state.categories);
   const accounts = useAppStore((state) => state.accounts);
-  const generateRecurringForRange = useAppStore(
-    (state) => state.generateRecurringForRange
-  );
   const generationSummary = useAppStore(
     (state) => state.lastRecurringGenerationSummary
   );

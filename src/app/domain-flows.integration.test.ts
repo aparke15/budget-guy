@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { loadOrCreatePersistedState } from "./storage";
 import {
   getAccountBalanceCents,
   getAccountLedgerBalanceCents,
@@ -72,9 +73,16 @@ async function loadStore(initialState?: PersistedState) {
   });
   vi.resetModules();
 
-  const module = await import("./store");
+  const [module, recurringActions] = await Promise.all([
+    import("./store"),
+    import("./recurring-store-actions"),
+  ]);
+  module.initializeAppStore(loadOrCreatePersistedState());
 
-  return module.useAppStore;
+  return {
+    useAppStore: module.useAppStore,
+    generateRecurringForMonth: recurringActions.generateRecurringForMonth,
+  };
 }
 
 describe("domain flow integration", () => {
@@ -89,7 +97,7 @@ describe("domain flow integration", () => {
   });
 
   it("keeps opening balances singular while still affecting balances and history only", async () => {
-    const useAppStore = await loadStore(
+    const { useAppStore } = await loadStore(
       createPersistedState({
         categories: [
           {
@@ -227,7 +235,7 @@ describe("domain flow integration", () => {
   });
 
   it("keeps transfer create, edit, delete flows pair-safe and balance-correct", async () => {
-    const useAppStore = await loadStore(
+    const { useAppStore } = await loadStore(
       createPersistedState({
         accounts: [
           {
@@ -316,7 +324,7 @@ describe("domain flow integration", () => {
   });
 
   it("preserves signed credit-account ledger semantics while displaying owed and available credit", async () => {
-    const useAppStore = await loadStore(
+    const { useAppStore } = await loadStore(
       createPersistedState({
         accounts: [
           {
@@ -422,7 +430,7 @@ describe("domain flow integration", () => {
   });
 
   it("returns recurring generation summaries while staying idempotent for standard and transfer rules", async () => {
-    const useAppStore = await loadStore(
+    const { useAppStore, generateRecurringForMonth } = await loadStore(
       createPersistedState({
         accounts: [
           {
@@ -483,7 +491,7 @@ describe("domain flow integration", () => {
       })
     );
 
-    const firstSummary = useAppStore.getState().generateRecurringForMonth("2026-04");
+    const firstSummary = generateRecurringForMonth("2026-04");
 
     expect(firstSummary).toEqual({
       startMonth: "2026-04",
@@ -530,7 +538,7 @@ describe("domain flow integration", () => {
       )
     ).toHaveLength(2);
 
-    const secondSummary = useAppStore.getState().generateRecurringForMonth("2026-04");
+    const secondSummary = generateRecurringForMonth("2026-04");
 
     expect(secondSummary).toEqual({
       startMonth: "2026-04",
@@ -567,7 +575,7 @@ describe("domain flow integration", () => {
   });
 
   it("uses split allocations for category reporting while keeping balances on the parent transaction", async () => {
-    const useAppStore = await loadStore(
+    const { useAppStore } = await loadStore(
       createPersistedState({
         accounts: [
           {

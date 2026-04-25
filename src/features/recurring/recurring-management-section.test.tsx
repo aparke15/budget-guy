@@ -15,14 +15,18 @@ type MockStoreState = {
   addRecurringRule: ReturnType<typeof vi.fn>;
   updateRecurringRule: ReturnType<typeof vi.fn>;
   deleteRecurringRule: ReturnType<typeof vi.fn>;
-  generateRecurringForRange: ReturnType<typeof vi.fn>;
   lastRecurringGenerationSummary: null;
 };
 
 let storeState: MockStoreState;
+const generateRecurringForRangeMock = vi.fn();
 
 vi.mock("../../app/store", () => ({
   useAppStore: (selector: (state: MockStoreState) => unknown) => selector(storeState),
+}));
+
+vi.mock("../../app/recurring-store-actions", () => ({
+  generateRecurringForRange: (...args: unknown[]) => generateRecurringForRangeMock(...args),
 }));
 
 function createStoreState(overrides: Partial<MockStoreState> = {}): MockStoreState {
@@ -75,7 +79,6 @@ function createStoreState(overrides: Partial<MockStoreState> = {}): MockStoreSta
     addRecurringRule: vi.fn(),
     updateRecurringRule: vi.fn(),
     deleteRecurringRule: vi.fn(),
-    generateRecurringForRange: vi.fn(),
     lastRecurringGenerationSummary: null,
     ...overrides,
   };
@@ -89,6 +92,7 @@ describe("recurring management archived-category behavior", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-21T12:34:56.000Z"));
+    generateRecurringForRangeMock.mockReset();
     storeState = createStoreState();
   });
 

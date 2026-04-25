@@ -1,12 +1,13 @@
-import {
-  buildLatestPersistedState,
-  migratePersistedStateToLatest,
-} from "../lib/persistence";
+import { migratePersistedStateToLatest } from "../lib/persistence";
 import { latestPersistedStateSchema } from "../lib/validation";
 import { createSeedState } from "../seed/seed-data";
-import type { PersistedState, PersistedStateCollections } from "../types";
-
-export const STORAGE_KEY = "budget-mvp";
+import type { PersistedState } from "../types";
+import {
+  buildPersistedStateSnapshot,
+  clearPersistedState,
+  savePersistedState,
+  STORAGE_KEY,
+} from "./storage-runtime";
 
 type ParsedPersistedStateResult =
   | {
@@ -18,11 +19,7 @@ type ParsedPersistedStateResult =
       error: string;
     };
 
-export function buildPersistedStateSnapshot(
-  collections: PersistedStateCollections
-): PersistedState {
-  return buildLatestPersistedState(collections);
-}
+export { buildPersistedStateSnapshot, clearPersistedState, savePersistedState, STORAGE_KEY };
 
 export function exportPersistedStateJson(state: PersistedState): string {
   const result = latestPersistedStateSchema.safeParse(state);
@@ -72,23 +69,6 @@ export function loadPersistedState(): PersistedState | null {
     console.warn("failed to load persisted state", error);
     return null;
   }
-}
-
-export function savePersistedState(state: PersistedState): void {
-  const result = latestPersistedStateSchema.safeParse(state);
-
-  if (!result.success) {
-    console.warn("refusing to save invalid persisted state", {
-      issues: result.error.issues,
-    });
-    return;
-  }
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(result.data));
-}
-
-export function clearPersistedState(): void {
-  localStorage.removeItem(STORAGE_KEY);
 }
 
 export function loadOrCreatePersistedState(): PersistedState {

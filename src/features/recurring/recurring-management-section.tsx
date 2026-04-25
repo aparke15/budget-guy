@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type SubmitEvent } from "react";
 
 import { useAppStore } from "../../app/store";
+import { generateRecurringForRange } from "../../app/recurring-store-actions";
 import { getSelectableCategories } from "../../lib/categories";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents } from "../../lib/money";
@@ -43,9 +44,6 @@ export function RecurringManagementSection(props: RecurringManagementSectionProp
   const addRecurringRule = useAppStore((state) => state.addRecurringRule);
   const updateRecurringRule = useAppStore((state) => state.updateRecurringRule);
   const deleteRecurringRule = useAppStore((state) => state.deleteRecurringRule);
-  const generateRecurringForRange = useAppStore(
-    (state) => state.generateRecurringForRange
-  );
   const generationSummary = useAppStore(
     (state) => state.lastRecurringGenerationSummary
   );
