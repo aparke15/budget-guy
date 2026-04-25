@@ -22,6 +22,7 @@ export type Category = {
   name: string;
   kind: CategoryKind;
   color?: string;
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -133,7 +134,9 @@ export const PERSISTED_STATE_V1_VERSION = 1;
 
 export const PERSISTED_STATE_V2_VERSION = 2;
 
-export const LATEST_PERSISTED_STATE_VERSION = PERSISTED_STATE_V2_VERSION;
+export const PERSISTED_STATE_V3_VERSION = 3;
+
+export const LATEST_PERSISTED_STATE_VERSION = PERSISTED_STATE_V3_VERSION;
 
 export type PersistedStateCollections = {
   accounts: Account[];
@@ -151,8 +154,15 @@ export type PersistedStateV2 = PersistedStateCollections & {
   version: typeof PERSISTED_STATE_V2_VERSION;
 };
 
-export type VersionedPersistedState = PersistedStateV1 | PersistedStateV2;
+export type PersistedStateV3 = PersistedStateCollections & {
+  version: typeof PERSISTED_STATE_V3_VERSION;
+};
 
-export type LatestPersistedState = PersistedStateV2;
+export type VersionedPersistedState =
+  | PersistedStateV1
+  | PersistedStateV2
+  | PersistedStateV3;
+
+export type LatestPersistedState = PersistedStateV3;
 
 export type PersistedState = LatestPersistedState;

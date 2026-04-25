@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type SubmitEvent } from "react";
 
 import { useAppStore } from "../../app/store";
+import { getSelectableCategories } from "../../lib/categories";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents } from "../../lib/money";
 import {
@@ -67,6 +68,20 @@ export function RecurringManagementSection() {
 
   const sortedAccounts = useMemo(() => sortItemsByName(accounts), [accounts]);
   const sortedCategories = useMemo(() => sortItemsByName(categories), [categories]);
+  const createCategories = useMemo(
+    () =>
+      getSelectableCategories(sortedCategories, {
+        includeCategoryId: createValues.categoryId,
+      }),
+    [createValues.categoryId, sortedCategories]
+  );
+  const editCategories = useMemo(
+    () =>
+      getSelectableCategories(sortedCategories, {
+        includeCategoryId: editValues.categoryId,
+      }),
+    [editValues.categoryId, sortedCategories]
+  );
   const sortedRecurringRules = useMemo(
     () => sortItemsByName(recurringRules),
     [recurringRules]
@@ -365,11 +380,11 @@ export function RecurringManagementSection() {
           values={createValues}
           error={createError}
           accounts={sortedAccounts}
-          categories={sortedCategories}
+          categories={createCategories}
           submitLabel="add recurring transaction"
           submitDisabled={
             sortedAccounts.length === 0 ||
-            (createValues.kind === "standard" && sortedCategories.length === 0) ||
+            (createValues.kind === "standard" && createCategories.length === 0) ||
             (createValues.kind === "transfer" && sortedAccounts.length < 2)
           }
           onSubmit={handleCreateSubmit}
@@ -391,7 +406,7 @@ export function RecurringManagementSection() {
           <p className="empty-state">
             add at least one account before saving recurring transactions.
           </p>
-        ) : createValues.kind === "standard" && sortedCategories.length === 0 ? (
+        ) : createValues.kind === "standard" && createCategories.length === 0 ? (
           <p className="empty-state">
             add at least one category before saving standard recurring transactions.
           </p>
@@ -422,12 +437,12 @@ export function RecurringManagementSection() {
                     values={editValues}
                     error={editError}
                     accounts={sortedAccounts}
-                    categories={sortedCategories}
+                    categories={editCategories}
                     submitLabel="save recurring transaction"
                     submitDisabled={
                       sortedAccounts.length === 0 ||
                       (editValues.kind === "standard" &&
-                        sortedCategories.length === 0) ||
+                          editCategories.length === 0) ||
                       (editValues.kind === "transfer" && sortedAccounts.length < 2)
                     }
                     onSubmit={handleEditSubmit}

@@ -192,8 +192,8 @@ export function buildDeleteImpact(
     ).length;
 
     return {
-      title: `delete category: ${pendingDelete.name}`,
-      description: `this will remove ${budgetCount} budget${budgetCount === 1 ? "" : "s"}, ${transactionCount} transaction${transactionCount === 1 ? "" : "s"}, and ${ruleCount} recurring rule${ruleCount === 1 ? "" : "s"}.`,
+      title: `archive category: ${pendingDelete.name}`,
+      description: `this keeps ${transactionCount} transaction${transactionCount === 1 ? "" : "s"}, ${budgetCount} budget${budgetCount === 1 ? "" : "s"}, and ${ruleCount} recurring rule${ruleCount === 1 ? "" : "s"} in history, but removes the category from new-use pickers until restored.`,
     };
   }
 

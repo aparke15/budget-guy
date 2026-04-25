@@ -5,6 +5,10 @@ import {
   createTransaction,
   createTransactionFormValues,
 } from "../../lib/factories";
+import {
+  getCategoryDisplayName,
+  getSelectableCategories,
+} from "../../lib/categories";
 import { makeId } from "../../lib/ids";
 import { formatCents, parseAmountInputToCents } from "../../lib/money";
 import {
@@ -60,10 +64,18 @@ export function TransactionForm(props: TransactionFormProps) {
   const standardKind = values.entryType === "income" ? "income" : "expense";
   const isTransferMode = values.entryType === "transfer";
   const isSplitMode = !isTransferMode && values.isSplit;
+  const selectedCategoryIds = useMemo(
+    () => [values.categoryId, ...values.splits.map((split) => split.categoryId)],
+    [values.categoryId, values.splits]
+  );
 
   const matchingCategories = useMemo(
-    () => categories.filter((category) => category.kind === standardKind),
-    [categories, standardKind]
+    () =>
+      getSelectableCategories(categories, {
+        kind: standardKind,
+        includeCategoryIds: selectedCategoryIds,
+      }),
+    [categories, selectedCategoryIds, standardKind]
   );
 
   useEffect(() => {
@@ -272,7 +284,7 @@ export function TransactionForm(props: TransactionFormProps) {
     }
 
     const nextCategoryId =
-      categories.find((category) => category.kind === nextEntryType)?.id ?? "";
+      getSelectableCategories(categories, { kind: nextEntryType })[0]?.id ?? "";
 
     setValues((current) => ({
       ...current,
@@ -468,7 +480,7 @@ export function TransactionForm(props: TransactionFormProps) {
                   <option value="">select category</option>
                   {matchingCategories.map((category) => (
                     <option key={category.id} value={category.id}>
-                      {category.name}
+                      {getCategoryDisplayName(category)}
                     </option>
                   ))}
                 </select>
@@ -536,7 +548,7 @@ export function TransactionForm(props: TransactionFormProps) {
                   <option value="">select category</option>
                   {matchingCategories.map((category) => (
                     <option key={category.id} value={category.id}>
-                      {category.name}
+                      {getCategoryDisplayName(category)}
                     </option>
                   ))}
                 </select>

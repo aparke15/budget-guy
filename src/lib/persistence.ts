@@ -8,9 +8,11 @@ import {
   LATEST_PERSISTED_STATE_VERSION,
   PERSISTED_STATE_V1_VERSION,
   PERSISTED_STATE_V2_VERSION,
+  PERSISTED_STATE_V3_VERSION,
   type LatestPersistedState,
   type PersistedStateV1,
   type PersistedStateV2,
+  type PersistedStateV3,
   type PersistedStateCollections,
 } from "../types";
 
@@ -39,6 +41,7 @@ export const LEGACY_PERSISTED_STATE_VERSION = 0;
 const persistedStateMigrations: PersistedStateMigrationRegistry = {
   [LEGACY_PERSISTED_STATE_VERSION]: migratePersistedStateV0ToV1,
   [PERSISTED_STATE_V1_VERSION]: migratePersistedStateV1ToV2,
+  [PERSISTED_STATE_V2_VERSION]: migratePersistedStateV2ToV3,
 };
 
 function getValidationErrorMessage(error: z.ZodError, fallback: string): string {
@@ -94,6 +97,25 @@ export function migratePersistedStateV1ToV2(
   return {
     version: PERSISTED_STATE_V2_VERSION,
     ...result.data,
+  };
+}
+
+export function migratePersistedStateV2ToV3(
+  input: unknown
+): PersistedStateV3 {
+  const result = persistedCollectionsSchema.safeParse(input);
+
+  if (!result.success) {
+    throw new Error(getValidationErrorMessage(result.error, "invalid persisted state"));
+  }
+
+  return {
+    version: PERSISTED_STATE_V3_VERSION,
+    ...result.data,
+    categories: result.data.categories.map((category) => ({
+      ...category,
+      archivedAt: category.archivedAt,
+    })),
   };
 }
 

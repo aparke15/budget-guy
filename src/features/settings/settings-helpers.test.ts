@@ -214,9 +214,9 @@ describe("settings helpers", () => {
     expect(
       buildDeleteImpact(pendingDelete, budgets, transactions, recurringRules)
     ).toEqual({
-      title: "delete category: rent",
+      title: "archive category: rent",
       description:
-        "this will remove 1 budget, 2 transactions, and 1 recurring rule.",
+        "this keeps 2 transactions, 1 budget, and 1 recurring rule in history, but removes the category from new-use pickers until restored.",
     });
   });
 
@@ -259,9 +259,9 @@ describe("settings helpers", () => {
         recurringRules
       )
     ).toEqual({
-      title: "delete category: groceries",
+      title: "archive category: groceries",
       description:
-        "this will remove 0 budgets, 1 transaction, and 0 recurring rules.",
+        "this keeps 1 transaction, 0 budgets, and 0 recurring rules in history, but removes the category from new-use pickers until restored.",
     });
   });
 

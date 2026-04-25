@@ -14,9 +14,9 @@ import {
   parsePersistedStateJson,
 } from "../../app/storage";
 import { createCategory } from "../../lib/factories";
+import { isCategoryArchived } from "../../lib/categories";
 import {
   countTransactionCategoryUsageByCategoryId,
-  transactionReferencesCategory,
 } from "../../lib/transaction-splits";
 import type { Category, PersistedState } from "../../types";
 import { CategoryEditor } from "../components/editors";
@@ -51,7 +51,8 @@ type CategoriesSectionProps = {
   recurringRuleCounts: Record<string, number>;
   addCategory: (input: Category) => void;
   updateCategory: (id: string, input: Partial<Category>) => void;
-  onRequestDelete: (category: Category) => void;
+  onRequestArchive: (category: Category) => void;
+  onRestore: (categoryId: string) => void;
 };
 
 function CategoriesSection(props: CategoriesSectionProps) {
@@ -62,7 +63,8 @@ function CategoriesSection(props: CategoriesSectionProps) {
     recurringRuleCounts,
     addCategory,
     updateCategory,
-    onRequestDelete,
+    onRequestArchive,
+    onRestore,
   } = props;
   const [createValues, setCreateValues] = useState<CategoryFormValues>(() =>
     createCategoryFormValues()
@@ -176,8 +178,8 @@ function CategoriesSection(props: CategoriesSectionProps) {
         <div className="section-title-group">
           <h2 className="section-title">categories</h2>
           <p className="section-subtitle">
-            category setup stays lightweight here. deletes still remove linked
-            budgets, transactions, and recurring rules.
+            category setup stays lightweight here. archive categories to keep
+            historical references intact while removing them from new-use pickers.
           </p>
         </div>
       </div>
@@ -223,6 +225,9 @@ function CategoriesSection(props: CategoriesSectionProps) {
                   >
                     {category.kind}
                   </span>
+                  {isCategoryArchived(category) ? (
+                    <span className="badge badge--neutral">archived</span>
+                  ) : null}
                 </div>
                 <div className="entity-card__meta">
                   {budgetCounts[category.id] ?? 0} budget
@@ -242,10 +247,18 @@ function CategoriesSection(props: CategoriesSectionProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => onRequestDelete(category)}
-                  style={compactDangerButtonStyle}
+                  onClick={() =>
+                    isCategoryArchived(category)
+                      ? onRestore(category.id)
+                      : onRequestArchive(category)
+                  }
+                  style={
+                    isCategoryArchived(category)
+                      ? compactSecondaryButtonStyle
+                      : compactDangerButtonStyle
+                  }
                 >
-                  delete
+                  {isCategoryArchived(category) ? "restore" : "archive"}
                 </button>
               </div>
             </div>
@@ -405,10 +418,8 @@ export function SettingsPage() {
   const recurringRules = useAppStore((state) => state.recurringRules);
   const addCategory = useAppStore((state) => state.addCategory);
   const updateCategory = useAppStore((state) => state.updateCategory);
-  const deleteCategory = useAppStore((state) => state.deleteCategory);
-  const deleteTransaction = useAppStore((state) => state.deleteTransaction);
-  const deleteBudget = useAppStore((state) => state.deleteBudget);
-  const deleteRecurringRule = useAppStore((state) => state.deleteRecurringRule);
+  const archiveCategory = useAppStore((state) => state.archiveCategory);
+  const unarchiveCategory = useAppStore((state) => state.unarchiveCategory);
   const replacePersistedState = useAppStore((state) => state.replacePersistedState);
   const resetSeedData = useAppStore((state) => state.resetSeedData);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -443,18 +454,7 @@ export function SettingsPage() {
       return;
     }
 
-    budgets
-      .filter((budget) => budget.categoryId === pendingDelete.id)
-      .forEach((budget) => deleteBudget(budget.id));
-    transactions
-      .filter((transaction) =>
-        transactionReferencesCategory(transaction, pendingDelete.id)
-      )
-      .forEach((transaction) => deleteTransaction(transaction.id));
-    recurringRules
-      .filter((rule) => rule.categoryId === pendingDelete.id)
-      .forEach((rule) => deleteRecurringRule(rule.id));
-    deleteCategory(pendingDelete.id);
+    archiveCategory(pendingDelete.id);
     setPendingDelete(null);
   }
 
@@ -484,7 +484,7 @@ export function SettingsPage() {
 
             <div className="button-row">
               <button type="button" onClick={handleConfirmDelete} style={dangerButtonStyle}>
-                confirm delete
+                confirm archive
               </button>
               <button
                 type="button"
@@ -515,13 +515,14 @@ export function SettingsPage() {
         recurringRuleCounts={categoryRecurringRuleCounts}
         addCategory={addCategory}
         updateCategory={updateCategory}
-        onRequestDelete={(category) =>
+        onRequestArchive={(category) =>
           setPendingDelete({
             entity: "category",
             id: category.id,
             name: category.name,
           })
         }
+        onRestore={unarchiveCategory}
       />
     </section>
   );

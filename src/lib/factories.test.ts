@@ -68,6 +68,36 @@ describe("factory helpers", () => {
     expect(values.toAccountId).toBe("acct-checking");
   });
 
+  it("excludes archived categories from new transaction defaults", () => {
+    const values = createTransactionFormValues(accounts, [
+      {
+        id: "cat-old-food",
+        name: "Old Food",
+        kind: "expense",
+        archivedAt: "2026-04-10T00:00:00.000Z",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-04-10T00:00:00.000Z",
+      },
+      {
+        id: "cat-food",
+        name: "Food",
+        kind: "expense",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "cat-salary",
+        name: "Salary",
+        kind: "income",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+
+    expect(values.categoryId).toBe("cat-food");
+    expect(values.splits[0]?.categoryId).toBe("cat-food");
+  });
+
   it("maps an existing transaction into editable form values", () => {
     const existing: Transaction = {
       id: "txn-1",
@@ -107,6 +137,41 @@ describe("factory helpers", () => {
       fromAccountId: "acct-checking",
       toAccountId: "acct-checking",
     });
+  });
+
+  it("preserves an archived category when editing an existing transaction", () => {
+    const existing: Transaction = {
+      id: "txn-1",
+      kind: "standard",
+      date: "2026-04-10",
+      amountCents: -12345,
+      accountId: "acct-checking",
+      categoryId: "cat-old-food",
+      merchant: "Coffee Shop",
+      note: "Morning",
+      source: "manual",
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-10T00:00:00.000Z",
+    };
+
+    const archivedCategories: Category[] = [
+      {
+        id: "cat-old-food",
+        name: "Old Food",
+        kind: "expense",
+        archivedAt: "2026-04-11T00:00:00.000Z",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-04-11T00:00:00.000Z",
+      },
+      ...categories,
+    ];
+
+    expect(
+      createTransactionFormValues(accounts, archivedCategories, {
+        mode: "standard",
+        transaction: existing,
+      }).categoryId
+    ).toBe("cat-old-food");
   });
 
   it("maps an existing split transaction into editable form values", () => {
@@ -167,6 +232,66 @@ describe("factory helpers", () => {
       fromAccountId: "acct-checking",
       toAccountId: "acct-checking",
     });
+  });
+
+  it("preserves archived split categories when editing an existing split transaction", () => {
+    const existing: Transaction = {
+      id: "txn-split",
+      kind: "standard",
+      date: "2026-04-10",
+      amountCents: -12345,
+      accountId: "acct-checking",
+      merchant: "Grocer",
+      note: "Weekly run",
+      splits: [
+        {
+          id: "split-1",
+          categoryId: "cat-old-food",
+          amountCents: -10000,
+          note: "meal prep",
+        },
+        {
+          id: "split-2",
+          categoryId: "cat-food",
+          amountCents: -2345,
+        },
+      ],
+      source: "manual",
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-10T00:00:00.000Z",
+    };
+
+    const archivedCategories: Category[] = [
+      {
+        id: "cat-old-food",
+        name: "Old Food",
+        kind: "expense",
+        archivedAt: "2026-04-11T00:00:00.000Z",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-04-11T00:00:00.000Z",
+      },
+      ...categories,
+    ];
+
+    expect(
+      createTransactionFormValues(accounts, archivedCategories, {
+        mode: "standard",
+        transaction: existing,
+      }).splits
+    ).toEqual([
+      {
+        id: "split-1",
+        categoryId: "cat-old-food",
+        amount: "100.00",
+        note: "meal prep",
+      },
+      {
+        id: "split-2",
+        categoryId: "cat-food",
+        amount: "23.45",
+        note: "",
+      },
+    ]);
   });
 
   it("creates an expense transaction and trims optional text fields", () => {

@@ -343,6 +343,13 @@ describe("domain flow integration", () => {
             createdAt: "2026-04-01T00:00:00.000Z",
             updatedAt: "2026-04-01T00:00:00.000Z",
           },
+          {
+            id: "cat-refund",
+            name: "refund",
+            kind: "income",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
         ],
       })
     );
@@ -365,7 +372,7 @@ describe("domain flow integration", () => {
       date: "2026-04-05",
       amountCents: 2000,
       accountId: "acct-credit",
-      categoryId: "cat-food",
+      categoryId: "cat-refund",
       merchant: "grocer",
       source: "manual",
       createdAt: "2026-04-05T00:00:00.000Z",

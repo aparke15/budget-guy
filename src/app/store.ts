@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { hasBudgetForMonthCategory } from "../features/budgets/budget-page-helpers";
+import { countTransactionsReferencingCategory } from "../lib/transaction-splits";
 import { getNowIso } from "../lib/dates";
 import {
   createOpeningBalanceTransaction,
@@ -11,12 +12,14 @@ import {
   generateRecurringTransactionsForRange,
   generateRecurringTransactionsForMonth,
 } from "../lib/recurring-generation";
+import { latestPersistedStateSchema } from "../lib/validation";
 import { createSeedState } from "../seed/seed-data";
 import type {
   Account,
   Budget,
   Category,
   PersistedState,
+  PersistedStateCollections,
   RecurringGenerationSummary,
   RecurringRule,
   Transaction,
@@ -48,6 +51,8 @@ type AppState = {
 
   addCategory: (input: Category) => void;
   updateCategory: (id: string, input: Partial<Category>) => void;
+  archiveCategory: (id: string) => void;
+  unarchiveCategory: (id: string) => void;
   deleteCategory: (id: string) => void;
 
   addTransaction: (input: Transaction) => void;
@@ -92,8 +97,102 @@ type AppState = {
 
 const initialData = loadOrCreatePersistedState();
 
+type StoreCollections = PersistedStateCollections;
+
 function sortTransactions(transactions: Transaction[]): Transaction[] {
   return [...transactions].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function getStoreCollections(state: AppState): StoreCollections {
+  return {
+    accounts: state.accounts,
+    categories: state.categories,
+    transactions: state.transactions,
+    budgets: state.budgets,
+    recurringRules: state.recurringRules,
+  };
+}
+
+function validateStoreCollectionsUpdate(
+  currentCollections: StoreCollections,
+  proposedUpdates: Partial<StoreCollections>,
+  action: string
+): StoreCollections | null {
+  const nextCollections = {
+    ...currentCollections,
+    ...proposedUpdates,
+  };
+  const snapshot = buildPersistedStateSnapshot(nextCollections);
+  const result = latestPersistedStateSchema.safeParse(snapshot);
+
+  if (!result.success) {
+    console.warn("rejecting invalid store update", {
+      action,
+      issues: result.error.issues,
+    });
+    return null;
+  }
+
+  return nextCollections;
+}
+
+function normalizeTransactionUpdate(
+  existingTransaction: Transaction,
+  input: Partial<Transaction>
+): Partial<Transaction> {
+  const nextKind = input.kind ?? existingTransaction.kind;
+
+  if (nextKind !== "standard") {
+    return {
+      ...input,
+      categoryId: undefined,
+      splits: undefined,
+    };
+  }
+
+  if (input.splits !== undefined) {
+    return {
+      ...input,
+      categoryId: undefined,
+    };
+  }
+
+  if (input.categoryId !== undefined) {
+    return {
+      ...input,
+      splits: undefined,
+    };
+  }
+
+  return input;
+}
+
+function buildUpdatedTransaction(
+  existingTransaction: Transaction,
+  input: Partial<Transaction>
+): Transaction {
+  const nextTransaction = {
+    ...existingTransaction,
+    ...normalizeTransactionUpdate(existingTransaction, input),
+    updatedAt: getNowIso(),
+  };
+
+  if (nextTransaction.kind !== "standard") {
+    const { categoryId: _categoryId, splits: _splits, ...normalizedTransaction } = nextTransaction;
+    return normalizedTransaction as Transaction;
+  }
+
+  if (nextTransaction.splits != null) {
+    const { categoryId: _categoryId, ...normalizedTransaction } = nextTransaction;
+    return normalizedTransaction as Transaction;
+  }
+
+  if (nextTransaction.categoryId != null) {
+    const { splits: _splits, ...normalizedTransaction } = nextTransaction;
+    return normalizedTransaction as Transaction;
+  }
+
+  return nextTransaction;
 }
 
 function getTransferGroupTransactions(
@@ -231,36 +330,68 @@ export const useAppStore = create<AppState>((set) => ({
   lastRecurringGenerationSummary: null,
 
   addAccount: (input) =>
-    set((state) => ({
-      accounts: [...state.accounts, input],
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          accounts: [...state.accounts, input],
+        },
+        "addAccount"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   updateAccount: (id, input) =>
-    set((state) => ({
-      accounts: state.accounts.map((account) =>
-        account.id === id
-          ? {
-              ...account,
-              ...input,
-              updatedAt: getNowIso(),
-            }
-          : account
-      ),
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          accounts: state.accounts.map((account) =>
+            account.id === id
+              ? {
+                  ...account,
+                  ...input,
+                  updatedAt: getNowIso(),
+                }
+              : account
+          ),
+        },
+        "updateAccount"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   deleteAccount: (id) =>
-    set((state) => ({
-      accounts: state.accounts.filter((account) => account.id !== id),
-      transactions: state.transactions.filter(
-        (transaction) => transaction.accountId !== id
-      ),
-      recurringRules: state.recurringRules.filter(
-        (rule) => rule.accountId !== id && rule.toAccountId !== id
-      ),
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          accounts: state.accounts.filter((account) => account.id !== id),
+          transactions: state.transactions.filter(
+            (transaction) => transaction.accountId !== id
+          ),
+          recurringRules: state.recurringRules.filter(
+            (rule) => rule.accountId !== id && rule.toAccountId !== id
+          ),
+        },
+        "deleteAccount"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   upsertAccountOpeningBalance: (accountId, amountCents, date, note) =>
     set((state) => {
+      if (!state.accounts.some((account) => account.id === accountId)) {
+        console.warn("rejecting invalid store update", {
+          action: "upsertAccountOpeningBalance",
+          issues: [{ message: `account ${accountId} must exist` }],
+        });
+        return {};
+      }
+
       const existing = getAccountOpeningBalanceTransaction(
         state.transactions,
         accountId
@@ -271,9 +402,15 @@ export const useAppStore = create<AppState>((set) => ({
       );
 
       if (amountCents === 0) {
-        return {
-          transactions: sortTransactions(transactionsWithoutOpeningBalance),
-        };
+        const nextCollections = validateStoreCollectionsUpdate(
+          getStoreCollections(state),
+          {
+            transactions: sortTransactions(transactionsWithoutOpeningBalance),
+          },
+          "upsertAccountOpeningBalance"
+        );
+
+        return nextCollections ?? {};
       }
 
       const openingBalanceTransaction = createOpeningBalanceTransaction({
@@ -284,43 +421,141 @@ export const useAppStore = create<AppState>((set) => ({
         existing,
       });
 
-      return {
-        transactions: sortTransactions([
-          ...transactionsWithoutOpeningBalance,
-          openingBalanceTransaction,
-        ]),
-      };
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          transactions: sortTransactions([
+            ...transactionsWithoutOpeningBalance,
+            openingBalanceTransaction,
+          ]),
+        },
+        "upsertAccountOpeningBalance"
+      );
+
+      return nextCollections ?? {};
     }),
 
   deleteAccountOpeningBalance: (accountId) =>
-    set((state) => ({
-      transactions: sortTransactions(
-        removeAccountOpeningBalanceTransactions(state.transactions, accountId)
-      ),
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          transactions: sortTransactions(
+            removeAccountOpeningBalanceTransactions(state.transactions, accountId)
+          ),
+        },
+        "deleteAccountOpeningBalance"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   addCategory: (input) =>
-    set((state) => ({
-      categories: [...state.categories, input],
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          categories: [...state.categories, input],
+        },
+        "addCategory"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   updateCategory: (id, input) =>
-    set((state) => ({
-      categories: state.categories.map((category) =>
-        category.id === id
-          ? {
-              ...category,
-              ...input,
-              updatedAt: getNowIso(),
-            }
-          : category
-      ),
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          categories: state.categories.map((category) =>
+            category.id === id
+              ? {
+                  ...category,
+                  ...input,
+                  updatedAt: getNowIso(),
+                }
+              : category
+          ),
+        },
+        "updateCategory"
+      );
+
+      return nextCollections ?? {};
+    }),
+
+  archiveCategory: (id) =>
+    set((state) => {
+      const archivedAt = getNowIso();
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          categories: state.categories.map((category) =>
+            category.id === id
+              ? {
+                  ...category,
+                  archivedAt,
+                  updatedAt: archivedAt,
+                }
+              : category
+          ),
+        },
+        "archiveCategory"
+      );
+
+      return nextCollections ?? {};
+    }),
+
+  unarchiveCategory: (id) =>
+    set((state) => {
+      const updatedAt = getNowIso();
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          categories: state.categories.map((category) =>
+            category.id === id
+              ? (() => {
+                  const { archivedAt: _archivedAt, ...rest } = category;
+
+                  return {
+                    ...rest,
+                    updatedAt,
+                  };
+                })()
+              : category
+          ),
+        },
+        "unarchiveCategory"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   deleteCategory: (id) =>
-    set((state) => ({
-      categories: state.categories.filter((category) => category.id !== id),
-    })),
+    set((state) => {
+      const hasReferences =
+        state.budgets.some((budget) => budget.categoryId === id) ||
+        state.recurringRules.some((rule) => rule.categoryId === id) ||
+        countTransactionsReferencingCategory(state.transactions, id) > 0;
+
+      if (hasReferences) {
+        console.warn("rejecting invalid store update", {
+          action: "deleteCategory",
+          issues: [{ message: `category ${id} must not have references before hard delete` }],
+        });
+        return {};
+      }
+
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          categories: state.categories.filter((category) => category.id !== id),
+        },
+        "deleteCategory"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   addTransaction: (input) =>
     set((state) => {
@@ -328,9 +563,15 @@ export const useAppStore = create<AppState>((set) => ({
         return {};
       }
 
-      return {
-        transactions: sortTransactions([...state.transactions, input]),
-      };
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          transactions: sortTransactions([...state.transactions, input]),
+        },
+        "addTransaction"
+      );
+
+      return nextCollections ?? {};
     }),
 
   updateTransaction: (id, input) =>
@@ -379,19 +620,21 @@ export const useAppStore = create<AppState>((set) => ({
         };
       }
 
-      return {
-        transactions: sortTransactions(
-          state.transactions.map((transaction) =>
-            transaction.id === id
-              ? {
-                  ...transaction,
-                  ...input,
-                  updatedAt: getNowIso(),
-                }
-              : transaction
-          )
-        ),
-      };
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          transactions: sortTransactions(
+            state.transactions.map((transaction) =>
+              transaction.id === id
+                ? buildUpdatedTransaction(transaction, input)
+                : transaction
+            )
+          ),
+        },
+        "updateTransaction"
+      );
+
+      return nextCollections ?? {};
     }),
 
   deleteTransaction: (id) =>
@@ -408,28 +651,48 @@ export const useAppStore = create<AppState>((set) => ({
         existingTransaction.kind === "transfer" &&
         existingTransaction.transferGroupId
       ) {
-        return {
-          transactions: removeTransferGroupTransactions(
-            state.transactions,
-            existingTransaction.transferGroupId
-          ),
-        };
+        const nextCollections = validateStoreCollectionsUpdate(
+          getStoreCollections(state),
+          {
+            transactions: removeTransferGroupTransactions(
+              state.transactions,
+              existingTransaction.transferGroupId
+            ),
+          },
+          "deleteTransaction"
+        );
+
+        return nextCollections ?? {};
       }
 
-      return {
-        transactions: state.transactions.filter(
-          (transaction) => transaction.id !== id
-        ),
-      };
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          transactions: state.transactions.filter(
+            (transaction) => transaction.id !== id
+          ),
+        },
+        "deleteTransaction"
+      );
+
+      return nextCollections ?? {};
     }),
 
   addTransfer: (input) =>
-    set((state) => ({
-      transactions: sortTransactions([
-        ...state.transactions,
-        ...createTransferTransactions({ input }),
-      ]),
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          transactions: sortTransactions([
+            ...state.transactions,
+            ...createTransferTransactions({ input }),
+          ]),
+        },
+        "addTransfer"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   updateTransfer: (transferGroupId, input) =>
     set((state) => {
@@ -448,22 +711,36 @@ export const useAppStore = create<AppState>((set) => ({
         },
       });
 
-      return {
-        transactions: replaceTransferGroupTransactions(
-          state.transactions,
-          transferGroupId,
-          replacementTransactions
-        ),
-      };
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          transactions: replaceTransferGroupTransactions(
+            state.transactions,
+            transferGroupId,
+            replacementTransactions
+          ),
+        },
+        "updateTransfer"
+      );
+
+      return nextCollections ?? {};
     }),
 
   deleteTransfer: (transferGroupId) =>
-    set((state) => ({
-      transactions: removeTransferGroupTransactions(
-        state.transactions,
-        transferGroupId
-      ),
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          transactions: removeTransferGroupTransactions(
+            state.transactions,
+            transferGroupId
+          ),
+        },
+        "deleteTransfer"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   addBudget: (input) =>
     set((state) => {
@@ -471,9 +748,15 @@ export const useAppStore = create<AppState>((set) => ({
         return {};
       }
 
-      return {
-        budgets: [...state.budgets, input],
-      };
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          budgets: [...state.budgets, input],
+        },
+        "addBudget"
+      );
+
+      return nextCollections ?? {};
     }),
 
   updateBudget: (id, input) =>
@@ -482,46 +765,84 @@ export const useAppStore = create<AppState>((set) => ({
         return {};
       }
 
-      return {
-        budgets: state.budgets.map((budget) =>
-          budget.id === id
-            ? {
-                ...budget,
-                ...input,
-                updatedAt: getNowIso(),
-              }
-            : budget
-        ),
-      };
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          budgets: state.budgets.map((budget) =>
+            budget.id === id
+              ? {
+                  ...budget,
+                  ...input,
+                  updatedAt: getNowIso(),
+                }
+              : budget
+          ),
+        },
+        "updateBudget"
+      );
+
+      return nextCollections ?? {};
     }),
 
   deleteBudget: (id) =>
-    set((state) => ({
-      budgets: state.budgets.filter((budget) => budget.id !== id),
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          budgets: state.budgets.filter((budget) => budget.id !== id),
+        },
+        "deleteBudget"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   addRecurringRule: (input) =>
-    set((state) => ({
-      recurringRules: [...state.recurringRules, input],
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          recurringRules: [...state.recurringRules, input],
+        },
+        "addRecurringRule"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   updateRecurringRule: (id, input) =>
-    set((state) => ({
-      recurringRules: state.recurringRules.map((rule) =>
-        rule.id === id
-          ? {
-              ...rule,
-              ...input,
-              updatedAt: getNowIso(),
-            }
-          : rule
-      ),
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          recurringRules: state.recurringRules.map((rule) =>
+            rule.id === id
+              ? {
+                  ...rule,
+                  ...input,
+                  updatedAt: getNowIso(),
+                }
+              : rule
+          ),
+        },
+        "updateRecurringRule"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   deleteRecurringRule: (id) =>
-    set((state) => ({
-      recurringRules: state.recurringRules.filter((rule) => rule.id !== id),
-    })),
+    set((state) => {
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          recurringRules: state.recurringRules.filter((rule) => rule.id !== id),
+        },
+        "deleteRecurringRule"
+      );
+
+      return nextCollections ?? {};
+    }),
 
   replacePersistedState: (persistedState) =>
     set({

@@ -1,5 +1,6 @@
 import type { SubmitEvent } from "react";
 
+import { getCategoryDisplayName } from "../../../lib/categories";
 import { parseAmountInputToCents } from "../../../lib/money";
 import type {
   Account,
@@ -151,7 +152,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
               <option value="">select category</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
-                  {category.name} ({category.kind})
+                  {getCategoryDisplayName(category)} ({category.kind})
                 </option>
               ))}
             </select>

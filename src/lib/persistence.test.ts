@@ -85,6 +85,11 @@ const V1_PERSISTED_STATE_FIXTURE: PersistedStateV1 = {
   ],
 };
 
+const V2_PERSISTED_STATE_FIXTURE = {
+  ...V1_PERSISTED_STATE_FIXTURE,
+  version: 2 as const,
+};
+
 describe("persistence migrations", () => {
   it("detects unversioned payloads as the legacy persisted version", () => {
     expect(detectPersistedStateVersion(LEGACY_PERSISTED_STATE_FIXTURE)).toBe(
@@ -113,6 +118,18 @@ describe("persistence migrations", () => {
       success: true,
       data: {
         ...V1_PERSISTED_STATE_FIXTURE,
+        version: LATEST_PERSISTED_STATE_VERSION,
+      },
+    });
+  });
+
+  it("migrates a v2 payload to the latest persisted shape", () => {
+    const result = migratePersistedStateToLatest(V2_PERSISTED_STATE_FIXTURE);
+
+    expect(result).toEqual({
+      success: true,
+      data: {
+        ...V2_PERSISTED_STATE_FIXTURE,
         version: LATEST_PERSISTED_STATE_VERSION,
       },
     });

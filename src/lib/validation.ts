@@ -24,6 +24,7 @@ export const categorySchema = z.object({
   name: z.string().min(1),
   kind: z.enum(["income", "expense"]),
   color: z.string().optional(),
+  archivedAt: z.string().datetime().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -373,6 +374,7 @@ function addPersistedStateRefinements<
   TSchema extends z.ZodObject<typeof persistedCollectionsShape>
 >(schema: TSchema) {
   return schema.superRefine((state, ctx) => {
+  const categoryIds = new Set(state.categories.map((category) => category.id));
   const categoryKindById = new Map(
     state.categories.map((category) => [category.id, category.kind])
   );
@@ -463,14 +465,72 @@ function addPersistedStateRefinements<
     });
   }
 
+  for (const budget of state.budgets) {
+    if (!categoryIds.has(budget.categoryId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["budgets"],
+        message: `budget category ${budget.categoryId} must exist`,
+      });
+    }
+  }
+
+  for (const rule of state.recurringRules) {
+    if (rule.categoryId && !categoryIds.has(rule.categoryId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["recurringRules"],
+        message: `recurring rule category ${rule.categoryId} must exist`,
+      });
+    }
+  }
+
   for (const transaction of state.transactions) {
-    if (transaction.kind !== "standard" || transaction.splits == null) {
+    if (transaction.kind !== "standard") {
+      continue;
+    }
+
+    if (transaction.categoryId && !categoryIds.has(transaction.categoryId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["transactions"],
+        message: `transaction category ${transaction.categoryId} must exist`,
+      });
+    }
+
+    if (transaction.splits == null) {
+      if (transaction.categoryId) {
+        const categoryKind = categoryKindById.get(transaction.categoryId);
+        const expectedCategoryKind = transaction.amountCents < 0 ? "expense" : "income";
+
+        if (
+          transaction.amountCents !== 0 &&
+          categoryKind &&
+          categoryKind !== expectedCategoryKind
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["transactions"],
+            message: `transaction category ${transaction.categoryId} must be a ${expectedCategoryKind} category`,
+          });
+        }
+      }
+
       continue;
     }
 
     const expectedCategoryKind = transaction.amountCents < 0 ? "expense" : "income";
 
     for (const split of transaction.splits) {
+      if (!categoryIds.has(split.categoryId)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["transactions"],
+          message: `split category ${split.categoryId} must exist`,
+        });
+        continue;
+      }
+
       const categoryKind = categoryKindById.get(split.categoryId);
 
       if (categoryKind && categoryKind !== expectedCategoryKind) {

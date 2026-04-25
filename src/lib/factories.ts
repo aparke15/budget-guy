@@ -1,3 +1,4 @@
+import { getActiveCategories } from "./categories";
 import { getNowIso } from "./dates";
 import { makeId } from "./ids";
 import {
@@ -97,7 +98,9 @@ function getDefaultCategoryId(
   categories: Category[],
   kind: CategoryKind
 ): string {
-  return categories.find((category) => category.kind === kind)?.id ?? "";
+  const activeCategories = getActiveCategories(categories);
+
+  return activeCategories.find((category) => category.kind === kind)?.id ?? "";
 }
 
 function getDefaultAccountId(accounts: Account[]): string {

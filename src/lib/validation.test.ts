@@ -53,7 +53,15 @@ describe("validation schemas", () => {
     const result = persistedStateSchema.safeParse({
       version: LATEST_PERSISTED_STATE_VERSION,
       accounts: [],
-      categories: [],
+      categories: [
+        {
+          id: "cat-1",
+          name: "food",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
       transactions: [
         {
           id: "txn-1",
@@ -175,7 +183,15 @@ describe("validation schemas", () => {
     const result = persistedStateSchema.safeParse({
       version: LATEST_PERSISTED_STATE_VERSION,
       accounts: [],
-      categories: [],
+      categories: [
+        {
+          id: "cat-1",
+          name: "rent",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
       transactions: [],
       budgets: [],
       recurringRules: [
@@ -492,6 +508,179 @@ describe("validation schemas", () => {
     if (!result.success) {
       expect(result.error.issues[0]?.message).toBe(
         "split category cat-income must be a expense category"
+      );
+    }
+  });
+
+  it("rejects non-split standard transactions whose category kind does not match the amount sign", () => {
+    const result = persistedStateSchema.safeParse({
+      version: LATEST_PERSISTED_STATE_VERSION,
+      accounts: [],
+      categories: [
+        {
+          id: "cat-income",
+          name: "Salary",
+          kind: "income",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-standard",
+          kind: "standard",
+          date: "2026-04-01",
+          amountCents: -1200,
+          accountId: "acct-1",
+          categoryId: "cat-income",
+          source: "manual",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      budgets: [],
+      recurringRules: [],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        "transaction category cat-income must be a expense category"
+      );
+    }
+  });
+
+  it("allows archived categories to remain valid persisted references", () => {
+    const result = persistedStateSchema.safeParse({
+      version: LATEST_PERSISTED_STATE_VERSION,
+      accounts: [],
+      categories: [
+        {
+          id: "cat-archived",
+          name: "Old Dining",
+          kind: "expense",
+          archivedAt: "2026-04-10T00:00:00.000Z",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-standard",
+          kind: "standard",
+          date: "2026-04-11",
+          amountCents: -1200,
+          accountId: "acct-1",
+          categoryId: "cat-archived",
+          source: "manual",
+          createdAt: "2026-04-11T00:00:00.000Z",
+          updatedAt: "2026-04-11T00:00:00.000Z",
+        },
+      ],
+      budgets: [
+        {
+          id: "budget-1",
+          month: "2026-04",
+          categoryId: "cat-archived",
+          plannedCents: 5000,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-1",
+          kind: "standard",
+          name: "old dining",
+          amountCents: -1000,
+          accountId: "acct-1",
+          categoryId: "cat-archived",
+          frequency: "monthly",
+          startDate: "2026-04-01",
+          active: true,
+          dayOfMonth: 1,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects persisted states with missing category references", () => {
+    const result = persistedStateSchema.safeParse({
+      version: LATEST_PERSISTED_STATE_VERSION,
+      accounts: [],
+      categories: [
+        {
+          id: "cat-existing",
+          name: "Food",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-split",
+          kind: "standard",
+          date: "2026-04-01",
+          amountCents: -1200,
+          accountId: "acct-1",
+          splits: [
+            {
+              id: "split-1",
+              categoryId: "cat-existing",
+              amountCents: -700,
+            },
+            {
+              id: "split-2",
+              categoryId: "cat-missing",
+              amountCents: -500,
+            },
+          ],
+          source: "manual",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      budgets: [
+        {
+          id: "budget-1",
+          month: "2026-04",
+          categoryId: "cat-missing",
+          plannedCents: 1000,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-1",
+          kind: "standard",
+          name: "food",
+          amountCents: -1000,
+          accountId: "acct-1",
+          categoryId: "cat-missing",
+          frequency: "monthly",
+          startDate: "2026-04-01",
+          active: true,
+          dayOfMonth: 1,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.message)).toEqual(
+        expect.arrayContaining([
+          "budget category cat-missing must exist",
+          "recurring rule category cat-missing must exist",
+          "split category cat-missing must exist",
+        ])
       );
     }
   });
