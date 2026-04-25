@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 
 import { useAppStore } from "../../app/store";
-import { inputStyle } from "../components/style-constants";
 import { buildForecast, type ForecastHorizon } from "../../lib/forecast";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents } from "../../lib/money";
@@ -68,7 +67,7 @@ export function ForecastPage() {
               min={getCurrentMonth()}
               value={startMonth}
               onChange={(event) => setStartMonth(event.target.value)}
-              style={inputStyle}
+              className="control"
             />
           </label>
 
@@ -77,7 +76,7 @@ export function ForecastPage() {
             <select
               value={horizon}
               onChange={(event) => setHorizon(event.target.value as ForecastHorizon)}
-              style={inputStyle}
+              className="control"
             >
               <option value="3">3 months</option>
               <option value="6">6 months</option>

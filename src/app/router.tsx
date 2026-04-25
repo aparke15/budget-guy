@@ -1,13 +1,57 @@
+import { Suspense, lazy } from "react";
 import { Navigate, createBrowserRouter } from "react-router-dom";
 
 import App from "../app";
-import { AccountsPage } from "../features/accounts/accounts-page";
-import { BudgetPage } from "../features/budgets/budget-page";
-import { DashboardPage } from "../features/dashboard/dashboard-page";
-import { ForecastPage } from "../features/forecast/forecast-page";
-import { RecurringPage } from "../features/recurring/recurring-page";
-import { SettingsPage } from "../features/settings/settings-page";
-import { TransactionsPage } from "../features/transactions/transactions-page";
+
+const DashboardPage = lazy(async () => {
+  const module = await import("../features/dashboard/dashboard-page");
+
+  return { default: module.DashboardPage };
+});
+
+const TransactionsPage = lazy(async () => {
+  const module = await import("../features/transactions/transactions-page");
+
+  return { default: module.TransactionsPage };
+});
+
+const AccountsPage = lazy(async () => {
+  const module = await import("../features/accounts/accounts-page");
+
+  return { default: module.AccountsPage };
+});
+
+const BudgetPage = lazy(async () => {
+  const module = await import("../features/budgets/budget-page");
+
+  return { default: module.BudgetPage };
+});
+
+const RecurringPage = lazy(async () => {
+  const module = await import("../features/recurring/recurring-page");
+
+  return { default: module.RecurringPage };
+});
+
+const ForecastPage = lazy(async () => {
+  const module = await import("../features/forecast/forecast-page");
+
+  return { default: module.ForecastPage };
+});
+
+const SettingsPage = lazy(async () => {
+  const module = await import("../features/settings/settings-page");
+
+  return { default: module.SettingsPage };
+});
+
+function RouteFallback() {
+  return <div className="empty-state">loading...</div>;
+}
+
+function withRouteSuspense(element: React.ReactNode) {
+  return <Suspense fallback={<RouteFallback />}>{element}</Suspense>;
+}
 
 export const appRoutes = [
   {
@@ -16,19 +60,19 @@ export const appRoutes = [
     children: [
       {
         index: true,
-        element: <DashboardPage />,
+        element: withRouteSuspense(<DashboardPage />),
       },
       {
         path: "transactions",
-        element: <TransactionsPage />,
+        element: withRouteSuspense(<TransactionsPage />),
       },
       {
         path: "accounts",
-        element: <AccountsPage />,
+        element: withRouteSuspense(<AccountsPage />),
       },
       {
         path: "budgets",
-        element: <BudgetPage />,
+        element: withRouteSuspense(<BudgetPage />),
       },
       {
         path: "budget",
@@ -36,15 +80,15 @@ export const appRoutes = [
       },
       {
         path: "recurring",
-        element: <RecurringPage />,
+        element: withRouteSuspense(<RecurringPage />),
       },
       {
         path: "forecast",
-        element: <ForecastPage />,
+        element: withRouteSuspense(<ForecastPage />),
       },
       {
         path: "settings",
-        element: <SettingsPage />,
+        element: withRouteSuspense(<SettingsPage />),
       },
     ],
   },

@@ -97,6 +97,27 @@ describe("persistence migrations", () => {
     );
   });
 
+  it("detects valid current-version payloads directly", () => {
+    expect(
+      detectPersistedStateVersion({
+        ...V1_PERSISTED_STATE_FIXTURE,
+        version: LATEST_PERSISTED_STATE_VERSION,
+      })
+    ).toBe(LATEST_PERSISTED_STATE_VERSION);
+  });
+
+  it.each([
+    { description: "negative versions", input: { version: -1 } },
+    { description: "non-integer versions", input: { version: 1.5 } },
+    { description: "string versions", input: { version: "3" } },
+  ])("rejects $description during version detection", ({ input }) => {
+    expect(detectPersistedStateVersion(input)).toBeNull();
+    expect(migratePersistedStateToLatest(input)).toEqual({
+      success: false,
+      error: "invalid persisted state payload",
+    });
+  });
+
   it("loads valid current-version payloads without changing them", () => {
     const currentPersistedStateFixture = {
       ...V1_PERSISTED_STATE_FIXTURE,

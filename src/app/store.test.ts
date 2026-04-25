@@ -388,6 +388,70 @@ describe("app store", () => {
     expect(JSON.parse(localStorage.getItem(storagekey) ?? "null")).toEqual(replacement);
   });
 
+  it("deletes recurring rules without mutating already-generated concrete transactions", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-1",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      categories: [
+        {
+          id: "cat-rent",
+          name: "rent",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-generated-rent",
+          kind: "standard",
+          date: "2026-04-05",
+          amountCents: -100000,
+          accountId: "acct-1",
+          categoryId: "cat-rent",
+          source: "recurring",
+          recurringRuleId: "rule-rent",
+          createdAt: "2026-04-05T00:00:00.000Z",
+          updatedAt: "2026-04-05T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-rent",
+          kind: "standard",
+          name: "rent",
+          amountCents: -100000,
+          accountId: "acct-1",
+          categoryId: "cat-rent",
+          frequency: "monthly",
+          startDate: "2026-01-01",
+          active: true,
+          dayOfMonth: 5,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore, localStorage } = await loadStore(persisted);
+
+    useAppStore.getState().deleteRecurringRule("rule-rent");
+
+    expect(useAppStore.getState().recurringRules).toEqual([]);
+    expect(useAppStore.getState().transactions).toEqual(persisted.transactions);
+
+    const saved = JSON.parse(localStorage.getItem(storagekey) ?? "null") as PersistedState;
+
+    expect(saved.recurringRules).toEqual([]);
+    expect(saved.transactions).toEqual(persisted.transactions);
+  });
+
   it("does not mutate store state when import parsing fails", async () => {
     const persisted = createPersistedState({
       accounts: [
@@ -475,8 +539,7 @@ describe("app store", () => {
     expect(saved.budgets).toHaveLength(2);
   });
 
-  it("rejects account deletion when it would orphan a transfer pair", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("deletes accounts by cascading transfer pairs, opening balances, and recurring rules", async () => {
     const persisted = createPersistedState({
       accounts: [
         {
@@ -490,6 +553,15 @@ describe("app store", () => {
           id: "acct-savings",
           name: "savings",
           type: "savings",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      categories: [
+        {
+          id: "cat-rent",
+          name: "rent",
+          kind: "expense",
           createdAt: "2026-04-01T00:00:00.000Z",
           updatedAt: "2026-04-01T00:00:00.000Z",
         },
@@ -517,6 +589,32 @@ describe("app store", () => {
           createdAt: "2026-04-10T00:00:00.000Z",
           updatedAt: "2026-04-10T00:00:00.000Z",
         },
+        {
+          id: "txn-opening",
+          kind: "opening-balance",
+          date: "2026-04-01",
+          amountCents: 10000,
+          accountId: "acct-checking",
+          source: "manual",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-checking",
+          kind: "standard",
+          name: "rent",
+          amountCents: -2500,
+          accountId: "acct-checking",
+          categoryId: "cat-rent",
+          frequency: "monthly",
+          startDate: "2026-04-01",
+          active: true,
+          dayOfMonth: 10,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
       ],
     });
     const { useAppStore } = await loadStore(persisted);
@@ -524,14 +622,10 @@ describe("app store", () => {
     useAppStore.getState().deleteAccount("acct-checking");
 
     expect(useAppStore.getState().accounts.map((account) => account.id)).toEqual([
-      "acct-checking",
       "acct-savings",
     ]);
-    expect(useAppStore.getState().transactions).toHaveLength(2);
-    expect(warnSpy).toHaveBeenCalledWith(
-      "rejecting invalid store update",
-      expect.objectContaining({ action: "deleteAccount" })
-    );
+    expect(useAppStore.getState().transactions).toEqual([]);
+    expect(useAppStore.getState().recurringRules).toEqual([]);
   });
 
   it("generates recurring transactions once per month and keeps them sorted", async () => {

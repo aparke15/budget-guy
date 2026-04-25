@@ -4,13 +4,6 @@ import { useSearchParams } from "react-router-dom";
 import { useAppStore } from "../../app/store";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents } from "../../lib/money";
-import {
-  compactDangerButtonStyle,
-  compactSecondaryButtonStyle,
-  inputStyle,
-  primaryButtonStyle,
-  secondaryButtonStyle,
-} from "../components/style-constants";
 import type { TransactionFormSubmission } from "../types";
 import { RecurringManagementSection } from "../recurring/recurring-management-section";
 import { TransactionForm } from "./transaction-form";
@@ -175,6 +168,18 @@ export function TransactionsPage() {
     setSearchParams(nextParams, { replace: true });
   }
 
+  function jumpToRecurringRule(ruleId: string) {
+    const nextParams = new URLSearchParams(searchParams);
+
+    nextParams.set("tab", "recurring");
+    nextParams.set("rule", ruleId);
+
+    setEditingId(null);
+    setShowCreateForm(false);
+    setExpandedTransactionId(null);
+    setSearchParams(nextParams, { replace: true });
+  }
+
   function handleCreate(submission: TransactionFormSubmission) {
     if (submission.mode === "transfer") {
       addTransfer(submission.input);
@@ -306,10 +311,20 @@ export function TransactionsPage() {
 
     return (
       <div className="table-actions transaction-card__actions">
+        {row.source === "recurring" && row.recurringRuleId ? (
+          <button
+            type="button"
+            onClick={() => jumpToRecurringRule(row.recurringRuleId!)}
+            className="button button--secondary button--compact"
+          >
+            edit rule
+          </button>
+        ) : null}
+
         <button
           type="button"
           onClick={() => startEditingTransaction(row.id)}
-          style={compactSecondaryButtonStyle}
+          className="button button--secondary button--compact"
         >
           edit
         </button>
@@ -317,7 +332,7 @@ export function TransactionsPage() {
         <button
           type="button"
           onClick={() => handleDelete(row)}
-          style={compactDangerButtonStyle}
+          className="button button--danger button--compact"
         >
           delete
         </button>
@@ -389,7 +404,7 @@ export function TransactionsPage() {
                         month: event.target.value,
                       }))
                     }
-                    style={inputStyle}
+                    className="control"
                   />
                 </label>
 
@@ -399,7 +414,7 @@ export function TransactionsPage() {
                     setShowCreateForm((current) => !current);
                     setEditingId(null);
                   }}
-                  style={primaryButtonStyle}
+                  className="button button--primary"
                 >
                   {showCreateForm ? "hide form" : "add transaction"}
                 </button>
@@ -476,7 +491,7 @@ export function TransactionsPage() {
                       accountId: event.target.value || null,
                     }))
                   }
-                  style={inputStyle}
+                  className="control"
                 >
                   <option value="">all accounts</option>
                   {accounts.map((account) => (
@@ -497,7 +512,7 @@ export function TransactionsPage() {
                       categoryId: event.target.value || null,
                     }))
                   }
-                  style={inputStyle}
+                  className="control"
                 >
                   <option value="">all categories</option>
                   {categories.map((category) => (
@@ -520,7 +535,7 @@ export function TransactionsPage() {
                     }))
                   }
                   placeholder="merchant or note"
-                  style={inputStyle}
+                  className="control"
                 />
               </label>
 
@@ -536,11 +551,7 @@ export function TransactionsPage() {
                     }))
                   }
                   disabled={!hasActiveFilters}
-                  style={{
-                    ...secondaryButtonStyle,
-                    cursor: hasActiveFilters ? "pointer" : "not-allowed",
-                    opacity: hasActiveFilters ? 1 : 0.6,
-                  }}
+                  className="button button--secondary"
                 >
                   clear filters
                 </button>
@@ -682,7 +693,7 @@ export function TransactionsPage() {
           </div>
         </>
       ) : (
-        <RecurringManagementSection />
+        <RecurringManagementSection focusedRuleId={searchParams.get("rule")} />
       )}
     </section>
   );

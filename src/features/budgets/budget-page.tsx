@@ -16,11 +16,6 @@ import {
   getMonthlySummary,
   parseAmountInputToCents,
 } from "../../lib/money";
-import {
-  compactSecondaryButtonStyle,
-  inputStyle,
-  primaryButtonStyle,
-} from "../components/style-constants";
 
 export function BudgetPage() {
   const [month, setMonth] = useState(getCurrentMonth());
@@ -159,14 +154,14 @@ export function BudgetPage() {
               type="month"
               value={month}
               onChange={(event) => setMonth(event.target.value)}
-              style={inputStyle}
+              className="control"
             />
           </label>
 
           <button
             type="button"
             onClick={saveAllBudgets}
-            style={primaryButtonStyle}
+            className="button button--primary"
           >
             save all budgets
           </button>
@@ -226,7 +221,11 @@ export function BudgetPage() {
 
                     <td className="money-column">
                       <input
-                        className="money-input budget-planned-input"
+                        className={
+                          dirty
+                            ? "control control--dense control--dirty money-input budget-planned-input"
+                            : "control control--dense money-input budget-planned-input"
+                        }
                         type="text"
                         inputMode="decimal"
                         placeholder="0.00"
@@ -234,13 +233,6 @@ export function BudgetPage() {
                         onChange={(event) =>
                           updateDraft(row.categoryId, event.target.value)
                         }
-                        style={{
-                          ...inputStyle,
-                          minHeight: "2.25rem",
-                          border: dirty
-                            ? "1px solid var(--color-accent)"
-                            : "1px solid var(--border-strong)",
-                        }}
                       />
                     </td>
 
@@ -256,15 +248,11 @@ export function BudgetPage() {
                           type="button"
                           onClick={() => saveCategoryBudget(row.categoryId)}
                           disabled={!dirty}
-                          style={{
-                            ...compactSecondaryButtonStyle,
-                            background: dirty ? "var(--button-primary-bg)" : "var(--bg-muted)",
-                            color: dirty ? "var(--button-primary-text)" : "var(--text-muted)",
-                            borderColor: dirty
-                              ? "var(--button-primary-border)"
-                              : "var(--border-strong)",
-                            cursor: dirty ? "pointer" : "not-allowed",
-                          }}
+                          className={
+                            dirty
+                              ? "button button--primary button--compact"
+                              : "button button--muted button--compact"
+                          }
                         >
                           save
                         </button>
@@ -346,7 +334,11 @@ export function BudgetPage() {
                       <label className="field">
                         <span className="field__label">planned</span>
                         <input
-                          className="money-input"
+                          className={
+                            dirty
+                              ? "control control--dense control--dirty money-input"
+                              : "control control--dense money-input"
+                          }
                           type="text"
                           inputMode="decimal"
                           placeholder="0.00"
@@ -355,13 +347,6 @@ export function BudgetPage() {
                           onChange={(event) =>
                             updateDraft(row.categoryId, event.target.value)
                           }
-                          style={{
-                            ...inputStyle,
-                            minHeight: "2.25rem",
-                            border: dirty
-                              ? "1px solid var(--color-accent)"
-                              : "1px solid var(--border-strong)",
-                          }}
                         />
                       </label>
 
@@ -377,15 +362,11 @@ export function BudgetPage() {
                           type="button"
                           onClick={() => saveCategoryBudget(row.categoryId)}
                           disabled={!dirty}
-                          style={{
-                            ...compactSecondaryButtonStyle,
-                            background: dirty ? "var(--button-primary-bg)" : "var(--bg-muted)",
-                            color: dirty ? "var(--button-primary-text)" : "var(--text-muted)",
-                            borderColor: dirty
-                              ? "var(--button-primary-border)"
-                              : "var(--border-strong)",
-                            cursor: dirty ? "pointer" : "not-allowed",
-                          }}
+                          className={
+                            dirty
+                              ? "button button--primary button--compact"
+                              : "button button--muted button--compact"
+                          }
                         >
                           save
                         </button>

@@ -8,6 +8,7 @@ What it does today:
 - Lets you manage your own accounts, categories, transactions, budgets, and recurring rules.
 - Lets you track balances on checking, savings, cash, and credit accounts.
 - Lets you move money between accounts with linked transfer entries.
+- Lets you split a standard transaction across multiple reporting categories.
 - Lets you keep opening balances as special transactions tied to accounts.
 - Lets you review account history and a recurring-based forecast.
 - Stores data in your browser's local storage on this device.
@@ -26,6 +27,7 @@ Important rules to know:
 - Opening balances are stored as special transactions, not as mutable account fields.
 - Budgets are monthly planned amounts per category.
 - Only expense categories appear on the budget page.
+- Archived categories stay valid for history and edits, but are hidden from new-use pickers by default.
 - Recurring rules are templates. They do not change your totals until you generate real transactions from them.
 - Credit cards use the same ledger model as every other account.
    - Negative ledger balance on a credit account means money owed.
@@ -41,6 +43,7 @@ Recommended first-time setup:
 3. Open **Settings** and add your categories.
    - Use **income** categories for paychecks or other income.
    - Use **expense** categories for spending categories like rent, groceries, or dining.
+   - Archive categories you no longer want to assign to new activity instead of deleting history.
 4. If you have repeating income or bills, add recurring rules in **Recurring**.
 5. Open **Transactions** and start recording real transactions or transfers.
 6. Open **Budget** and enter planned monthly amounts for your expense categories.
@@ -70,7 +73,7 @@ Use this order each month:
 
 3. **Record manual transactions as they happen**
    - Go to **Transactions**.
-   - Add income, expense, and transfer transactions.
+   - Add income, expense, transfer, and split transactions.
    - Choose the correct account, category, date, and optional merchant or note.
    - Edit or delete transactions if you made a mistake.
 
@@ -215,6 +218,7 @@ What you can do:
 - Clear active filters.
 - Add a transaction.
 - Edit a standard transaction or transfer.
+- Create and edit split transactions.
 - Delete a standard transaction or transfer.
 
 How to record a transaction:
@@ -230,8 +234,21 @@ How to record a transaction:
    - Category choices are filtered by the selected type.
    - Income transactions only show income categories.
    - Expense transactions only show expense categories.
+   - Archived categories are excluded from new selections by default.
+   - If you edit an existing transaction that already uses an archived category, that current value still stays visible.
 7. Optionally add a merchant and note.
 8. Save the transaction.
+
+How to record a split transaction:
+1. Click **add transaction**.
+2. Choose **income** or **expense**.
+3. Enter the parent amount, date, and account.
+4. Turn on **split transaction**.
+5. Add at least two split rows.
+6. Pick a category and amount for each row.
+7. Keep the split rows balanced with the parent transaction total.
+8. Optionally add split notes plus any parent merchant/note.
+9. Save the transaction.
 
 How to record a transfer:
 1. Click **add transaction**.
@@ -249,6 +266,13 @@ Transfer behavior:
   - a positive entry on the destination account
 - Transfers affect account balances and account history.
 - Transfers do **not** count as income or expenses in dashboard/budget reporting.
+
+Split behavior:
+- A split transaction is still one saved standard transaction in the ledger.
+- The parent transaction amount continues to drive account balances and ledger history.
+- Split rows drive category reporting and budget actuals.
+- Split rows do not create additional child transactions.
+- Archived categories are hidden from new split-line choices by default, but remain visible when editing a saved split that already references them.
 
 Opening-balance behavior on this page:
 - Opening balances may appear in the transactions list as labeled rows.
@@ -282,6 +306,8 @@ How budgeting works here:
 - Budgets are monthly planned amounts per category.
 - Only expense categories are budgeted on this page.
 - Every expense category gets a row automatically.
+- Archived expense categories do not show up as fresh planning rows by default.
+- If the selected month already has saved budgets or transaction history for an archived category, that row still stays visible.
 - Actual spending is based on expense transactions in the selected month.
 - Remaining = planned minus actual.
 - A negative remaining amount means the category is over budget.
@@ -304,15 +330,18 @@ Use settings to manage the app's core setup.
 What you can do:
 - Export a JSON backup.
 - Import a JSON backup that replaces the current dataset.
-- Add, edit, and delete categories.
-- Review simple usage counts before deleting items.
+- Add, edit, archive, and restore categories.
+- Review simple usage counts before archiving items.
 - Use **reset seed data**.
 
 #### Categories
 - Categories classify income and spending.
 - Category names must be unique.
 - Each category is either **income** or **expense**.
-- Deleting a category also deletes linked budgets, linked transactions, and linked recurring rules.
+- Archiving a category is the normal way to retire it.
+- Archived categories keep linked transactions, split allocations, budgets, and recurring rules intact.
+- Archived categories remain visible in historical displays and in edit forms for existing records.
+- Archived categories are removed from new transaction, split, recurring-rule, and budget selection by default until restored.
 
 #### Backup import/export
 - **export json backup** downloads the full current persisted dataset.
@@ -373,7 +402,8 @@ Important behavior:
    - the rule has valid account references and, for standard rules, a valid category
   - the selected month contains a matching occurrence
    - you manually clicked **generate recurring** on the dashboard or recurring page
-- If you delete an account or category, linked records are removed too.
+- If you delete an account, linked records are removed too.
+- If you retire a category, archive it so linked history stays intact.
 - Export a backup before doing major cleanup or importing replacement data.
 - The app is local-first, so data stays in this browser storage unless you reset it or clear browser storage.
 
@@ -386,7 +416,6 @@ Current MVP limitations:
 - There is no account system or authentication.
 - There is no bank sync.
 - There is no CSV import.
-- There are no split transactions.
 - Recurring rules do not auto-run; you must generate them manually.
 - Credit account support is limited to signed balance display, credit limits, and available-credit display.
 - There is no interest, APR, statement cycle, due-date, or minimum-payment logic.

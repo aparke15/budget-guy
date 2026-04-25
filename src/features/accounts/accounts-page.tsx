@@ -13,13 +13,6 @@ import { formatCents } from "../../lib/money";
 import type { Account } from "../../types";
 import { AccountEditor } from "../components/editors";
 import {
-  compactDangerButtonStyle,
-  compactSecondaryButtonStyle,
-  dangerButtonStyle,
-  primaryButtonStyle,
-  secondaryButtonStyle,
-} from "../components/style-constants";
-import {
   buildDeleteImpact,
   countById,
   countRecurringRulesByAccountId,
@@ -374,7 +367,7 @@ export function AccountsPage() {
                 .getElementById("account-create-form")
                 ?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
-            style={primaryButtonStyle}
+            className="button button--primary"
           >
             new account
           </button>
@@ -565,13 +558,17 @@ export function AccountsPage() {
             </div>
 
             <div className="button-row">
-              <button type="button" onClick={handleConfirmDelete} style={dangerButtonStyle}>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="button button--danger"
+              >
                 confirm delete
               </button>
               <button
                 type="button"
                 onClick={() => setPendingDelete(null)}
-                style={secondaryButtonStyle}
+                className="button button--secondary"
               >
                 cancel
               </button>
@@ -659,14 +656,14 @@ export function AccountsPage() {
                       setSelectedAccountId(account.id);
                       startEditing(account);
                     }}
-                    style={compactSecondaryButtonStyle}
+                    className="button button--secondary button--compact"
                   >
                     edit
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedAccountId(account.id)}
-                    style={compactSecondaryButtonStyle}
+                    className="button button--secondary button--compact"
                   >
                     view history
                   </button>
@@ -679,7 +676,7 @@ export function AccountsPage() {
                         name: account.name,
                       })
                     }
-                    style={compactDangerButtonStyle}
+                    className="button button--danger button--compact"
                   >
                     delete
                   </button>
@@ -716,12 +713,11 @@ export function AccountsPage() {
                   key={option.value}
                   type="button"
                   onClick={() => setHistoryRange(option.value)}
-                  style={{
-                    ...secondaryButtonStyle,
-                    background: active
-                      ? "var(--color-surface-hover)"
-                      : secondaryButtonStyle.background,
-                  }}
+                  className={
+                    active
+                      ? "button button--secondary button--selected"
+                      : "button button--secondary"
+                  }
                 >
                   {option.label}
                 </button>

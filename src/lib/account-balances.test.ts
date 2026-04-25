@@ -229,8 +229,45 @@ describe("account balance helpers", () => {
     expect(getDisplayedAccountBalanceLabel(creditAccount)).toBe("balance");
     expect(getDisplayedAccountBalanceCents(creditAccount, -20000)).toBe(-20000);
     expect(getDisplayedAccountBalanceCents(creditAccount, 5000)).toBe(5000);
-    expect(getAvailableCreditCents(creditAccount, -20000)).toBe(180000);
-    expect(getAvailableCreditCents(creditAccount, 5000)).toBe(200000);
+  });
+
+  it.each([
+    {
+      description: "returns the full limit when the ledger is zero",
+      ledgerBalanceCents: 0,
+      expectedAvailableCreditCents: 200000,
+    },
+    {
+      description: "caps positive balances at the full limit",
+      ledgerBalanceCents: 3500,
+      expectedAvailableCreditCents: 200000,
+    },
+    {
+      description: "reduces available credit for debt carried on the ledger",
+      ledgerBalanceCents: -75000,
+      expectedAvailableCreditCents: 125000,
+    },
+    {
+      description: "goes negative when the account is over the credit limit",
+      ledgerBalanceCents: -250000,
+      expectedAvailableCreditCents: -50000,
+    },
+  ])("$description", ({ ledgerBalanceCents, expectedAvailableCreditCents }) => {
+    expect(getAvailableCreditCents(accounts[2]!, ledgerBalanceCents)).toBe(
+      expectedAvailableCreditCents
+    );
+  });
+
+  it("does not report available credit for non-credit accounts or missing limits", () => {
+    expect(getAvailableCreditCents(accounts[0]!, -5000)).toBeUndefined();
+    expect(
+      getAvailableCreditCents(
+        {
+          type: "credit",
+        },
+        -5000
+      )
+    ).toBeUndefined();
   });
 
   it("builds monthly history rows with inflows, outflows, net change, and closing balance", () => {

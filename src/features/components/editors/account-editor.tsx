@@ -1,6 +1,5 @@
 import type { SubmitEvent } from "react";
 import type { AccountFormValues } from "../../types";
-import { inputStyle, primaryButtonStyle, secondaryButtonStyle } from "../style-constants";
 import type { AccountType } from "../../../types";
 
 type AccountEditorProps = {
@@ -27,7 +26,7 @@ export function AccountEditor(props: AccountEditorProps) {
             type="text"
             value={values.name}
             onChange={(event) => onChange("name", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
@@ -38,7 +37,7 @@ export function AccountEditor(props: AccountEditorProps) {
             onChange={(event) =>
               onChange("type", event.target.value as AccountType)
             }
-            style={inputStyle}
+            className="control"
           >
             <option value="checking">checking</option>
             <option value="savings">savings</option>
@@ -56,7 +55,7 @@ export function AccountEditor(props: AccountEditorProps) {
               placeholder="0.00"
               value={values.creditLimit}
               onChange={(event) => onChange("creditLimit", event.target.value)}
-              style={inputStyle}
+              className="control"
             />
           </label>
         ) : null}
@@ -69,7 +68,7 @@ export function AccountEditor(props: AccountEditorProps) {
             placeholder="0.00"
             value={values.openingBalance}
             onChange={(event) => onChange("openingBalance", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
@@ -79,7 +78,7 @@ export function AccountEditor(props: AccountEditorProps) {
             type="date"
             value={values.openingBalanceDate}
             onChange={(event) => onChange("openingBalanceDate", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
       </div>
@@ -89,12 +88,12 @@ export function AccountEditor(props: AccountEditorProps) {
       ) : null}
 
       <div className="button-row">
-        <button type="submit" style={primaryButtonStyle}>
+        <button type="submit" className="button button--primary">
           {submitLabel}
         </button>
 
         {onCancel ? (
-          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
+          <button type="button" onClick={onCancel} className="button button--secondary">
             cancel
           </button>
         ) : null}

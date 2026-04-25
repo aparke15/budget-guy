@@ -9,11 +9,6 @@ import type {
   RecurringRuleKind,
 } from "../../../types";
 import type { RecurringRuleFormValues } from "../../types";
-import {
-  inputStyle,
-  primaryButtonStyle,
-  secondaryButtonStyle,
-} from "../style-constants";
 
 type RecurringRuleEditorProps = {
   values: RecurringRuleFormValues;
@@ -78,7 +73,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
           <select
             value={values.kind}
             onChange={(event) => onKindChange(event.target.value as RecurringRuleKind)}
-            style={inputStyle}
+            className="control"
           >
             <option value="standard">standard</option>
             <option value="transfer">transfer</option>
@@ -91,7 +86,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             type="text"
             value={values.name}
             onChange={(event) => onChange("name", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
@@ -103,7 +98,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             placeholder="0.00"
             value={values.amount}
             onChange={(event) => onChange("amount", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
@@ -114,7 +109,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
           <select
             value={values.accountId}
             onChange={(event) => onChange("accountId", event.target.value)}
-            style={inputStyle}
+            className="control"
           >
             <option value="">select account</option>
             {accounts.map((account) => (
@@ -131,7 +126,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             <select
               value={values.toAccountId}
               onChange={(event) => onChange("toAccountId", event.target.value)}
-              style={inputStyle}
+              className="control"
             >
               <option value="">select account</option>
               {accounts.map((account) => (
@@ -147,7 +142,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             <select
               value={values.categoryId}
               onChange={(event) => onChange("categoryId", event.target.value)}
-              style={inputStyle}
+              className="control"
             >
               <option value="">select category</option>
               {categories.map((category) => (
@@ -166,7 +161,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
               type="text"
               value={values.merchant}
               onChange={(event) => onChange("merchant", event.target.value)}
-              style={inputStyle}
+              className="control"
             />
           </label>
         ) : null}
@@ -177,7 +172,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             type="text"
             value={values.note}
             onChange={(event) => onChange("note", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
       </div>
@@ -199,7 +194,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             onChange={(event) =>
               onFrequencyChange(event.target.value as RecurringFrequency)
             }
-            style={inputStyle}
+            className="control"
           >
             <option value="monthly">monthly</option>
             <option value="weekly">weekly</option>
@@ -214,7 +209,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             type="date"
             value={values.startDate}
             onChange={(event) => onStartDateChange(event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
@@ -224,7 +219,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             type="date"
             value={values.endDate}
             onChange={(event) => onChange("endDate", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
@@ -237,7 +232,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
               max="31"
               value={values.dayOfMonth}
               onChange={(event) => onChange("dayOfMonth", event.target.value)}
-              style={inputStyle}
+              className="control"
             />
           </label>
         ) : values.frequency === "weekly" || values.frequency === "biweekly" ? (
@@ -246,7 +241,7 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
             <select
               value={values.dayOfWeek}
               onChange={(event) => onChange("dayOfWeek", event.target.value)}
-              style={inputStyle}
+              className="control"
             >
               <option value="0">sun</option>
               <option value="1">mon</option>
@@ -285,20 +280,13 @@ export function RecurringRuleEditor(props: RecurringRuleEditorProps) {
         <button
           type="submit"
           disabled={submitDisabled || transferSubmitInvalid}
-          style={{
-            ...primaryButtonStyle,
-            opacity: submitDisabled || transferSubmitInvalid ? 0.6 : 1,
-            cursor:
-              submitDisabled || transferSubmitInvalid
-                ? "not-allowed"
-                : "pointer",
-          }}
+          className="button button--primary"
         >
           {submitLabel}
         </button>
 
         {onCancel ? (
-          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
+          <button type="button" onClick={onCancel} className="button button--secondary">
             cancel
           </button>
         ) : null}

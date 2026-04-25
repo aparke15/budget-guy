@@ -1,6 +1,5 @@
 import type { SubmitEvent } from "react";
 import type { CategoryFormValues } from "../../types";
-import { inputStyle, primaryButtonStyle, secondaryButtonStyle } from "../style-constants";
 import type { CategoryKind } from "../../../types";
 
 type CategoryEditorProps = {
@@ -27,7 +26,7 @@ export function CategoryEditor(props: CategoryEditorProps) {
             type="text"
             value={values.name}
             onChange={(event) => onChange("name", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
@@ -38,7 +37,7 @@ export function CategoryEditor(props: CategoryEditorProps) {
             onChange={(event) =>
               onChange("kind", event.target.value as CategoryKind)
             }
-            style={inputStyle}
+            className="control"
           >
             <option value="expense">expense</option>
             <option value="income">income</option>
@@ -51,12 +50,12 @@ export function CategoryEditor(props: CategoryEditorProps) {
       ) : null}
 
       <div className="button-row">
-        <button type="submit" style={primaryButtonStyle}>
+        <button type="submit" className="button button--primary">
           {submitLabel}
         </button>
 
         {onCancel ? (
-          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
+          <button type="button" onClick={onCancel} className="button button--secondary">
             cancel
           </button>
         ) : null}

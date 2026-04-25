@@ -15,14 +15,6 @@ import {
 import type { RecurringRuleFormValues } from "../types";
 import { RecurringRuleEditor } from "../components/editors";
 import {
-  compactDangerButtonStyle,
-  compactSecondaryButtonStyle,
-  dangerButtonStyle,
-  inputStyle,
-  primaryButtonStyle,
-  secondaryButtonStyle,
-} from "../components/style-constants";
-import {
   buildRecurringRuleCandidate,
   createRecurringRuleFormValues,
   ensureRecurringFormReferences,
@@ -37,7 +29,12 @@ function getRuleKindBadgeClass(kind: RecurringRuleFormValues["kind"] | "standard
   return kind === "transfer" ? "badge badge--transfer" : "badge badge--recurring";
 }
 
-export function RecurringManagementSection() {
+type RecurringManagementSectionProps = {
+  focusedRuleId?: string | null;
+};
+
+export function RecurringManagementSection(props: RecurringManagementSectionProps) {
+  const { focusedRuleId = null } = props;
   const accounts = useAppStore((state) => state.accounts);
   const categories = useAppStore((state) => state.categories);
   const transactions = useAppStore((state) => state.transactions);
@@ -126,6 +123,22 @@ export function RecurringManagementSection() {
       ensureRecurringFormReferences(current, sortedAccounts, sortedCategories)
     );
   }, [editingId, recurringRules, sortedAccounts, sortedCategories]);
+
+  useEffect(() => {
+    if (!focusedRuleId || editingId === focusedRuleId) {
+      return;
+    }
+
+    const rule = recurringRules.find((currentRule) => currentRule.id === focusedRuleId);
+
+    if (!rule) {
+      return;
+    }
+
+    setEditingId(rule.id);
+    setEditValues(createRecurringRuleFormValues(sortedAccounts, sortedCategories, rule));
+    setEditError("");
+  }, [editingId, focusedRuleId, recurringRules, sortedAccounts, sortedCategories]);
 
   function updateCreateField<K extends keyof RecurringRuleFormValues>(
     key: K,
@@ -287,7 +300,7 @@ export function RecurringManagementSection() {
                 type="month"
                 value={startMonth}
                 onChange={(event) => setStartMonth(event.target.value)}
-                style={inputStyle}
+                className="control"
               />
             </label>
 
@@ -299,14 +312,14 @@ export function RecurringManagementSection() {
                 step="1"
                 value={monthCount}
                 onChange={(event) => setMonthCount(event.target.value)}
-                style={inputStyle}
+                className="control"
               />
             </label>
 
             <button
               type="button"
               onClick={handleGenerateRecurring}
-              style={primaryButtonStyle}
+              className="button button--primary"
             >
               generate recurring range
             </button>
@@ -350,13 +363,17 @@ export function RecurringManagementSection() {
             </div>
 
             <div className="button-row">
-              <button type="button" onClick={handleConfirmDelete} style={dangerButtonStyle}>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="button button--danger"
+              >
                 confirm delete
               </button>
               <button
                 type="button"
                 onClick={() => setPendingDelete(null)}
-                style={secondaryButtonStyle}
+                className="button button--secondary"
               >
                 cancel
               </button>
@@ -515,14 +532,14 @@ export function RecurringManagementSection() {
                   <button
                     type="button"
                     onClick={() => startEditing(rule.id)}
-                    style={compactSecondaryButtonStyle}
+                    className="button button--secondary button--compact"
                   >
                     edit
                   </button>
                   <button
                     type="button"
                     onClick={() => duplicateRule(rule.id)}
-                    style={compactSecondaryButtonStyle}
+                    className="button button--secondary button--compact"
                   >
                     duplicate
                   </button>
@@ -535,7 +552,7 @@ export function RecurringManagementSection() {
                         name: rule.name,
                       })
                     }
-                    style={compactDangerButtonStyle}
+                    className="button button--danger button--compact"
                   >
                     delete
                   </button>

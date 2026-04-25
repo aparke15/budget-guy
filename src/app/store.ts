@@ -243,6 +243,31 @@ function removeTransferGroupTransactions(
   );
 }
 
+function removeTransactionsForDeletedAccount(
+  transactions: Transaction[],
+  accountId: string
+): Transaction[] {
+  const transferGroupIds = new Set(
+    transactions
+      .filter(
+        (transaction) =>
+          transaction.accountId === accountId && transaction.transferGroupId
+      )
+      .map((transaction) => transaction.transferGroupId)
+      .filter((transferGroupId): transferGroupId is string => Boolean(transferGroupId))
+  );
+
+  return transactions.filter((transaction) => {
+    if (transaction.accountId === accountId) {
+      return false;
+    }
+
+    return !(
+      transaction.transferGroupId && transferGroupIds.has(transaction.transferGroupId)
+    );
+  });
+}
+
 function buildTransferUpdateInput(
   existingTransaction: Transaction,
   pair: {
@@ -369,9 +394,7 @@ export const useAppStore = create<AppState>((set) => ({
         getStoreCollections(state),
         {
           accounts: state.accounts.filter((account) => account.id !== id),
-          transactions: state.transactions.filter(
-            (transaction) => transaction.accountId !== id
-          ),
+          transactions: removeTransactionsForDeletedAccount(state.transactions, id),
           recurringRules: state.recurringRules.filter(
             (rule) => rule.accountId !== id && rule.toAccountId !== id
           ),

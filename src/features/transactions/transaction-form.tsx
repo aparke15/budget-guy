@@ -11,12 +11,6 @@ import {
 } from "../../lib/categories";
 import { makeId } from "../../lib/ids";
 import { formatCents, parseAmountInputToCents } from "../../lib/money";
-import {
-  inputStyle,
-  primaryButtonStyle,
-  secondaryButtonStyle,
-  textAreaStyle,
-} from "../components/style-constants";
 import type { TransactionFormProps, TransactionFormValues } from "../types";
 
 function createEmptySplitRows(categoryId: string): TransactionFormValues["splits"] {
@@ -387,7 +381,7 @@ export function TransactionForm(props: TransactionFormProps) {
                 event.target.value as "income" | "expense" | "transfer"
               )
             }
-            style={inputStyle}
+            className="control"
           >
             <option value="expense">expense</option>
             <option value="income">income</option>
@@ -403,7 +397,7 @@ export function TransactionForm(props: TransactionFormProps) {
             placeholder="0.00"
             value={values.amount}
             onChange={(event) => updateField("amount", stripNegativeSign(event.target.value))}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
@@ -413,7 +407,7 @@ export function TransactionForm(props: TransactionFormProps) {
             type="date"
             value={values.date}
             onChange={(event) => updateField("date", event.target.value)}
-            style={inputStyle}
+            className="control"
           />
         </label>
 
@@ -424,7 +418,7 @@ export function TransactionForm(props: TransactionFormProps) {
               <select
                 value={values.fromAccountId}
                 onChange={(event) => updateField("fromAccountId", event.target.value)}
-                style={inputStyle}
+                className="control"
               >
                 <option value="">select account</option>
                 {accounts.map((account) => (
@@ -440,7 +434,7 @@ export function TransactionForm(props: TransactionFormProps) {
               <select
                 value={values.toAccountId}
                 onChange={(event) => updateField("toAccountId", event.target.value)}
-                style={inputStyle}
+                className="control"
               >
                 <option value="">select account</option>
                 {accounts.map((account) => (
@@ -458,7 +452,7 @@ export function TransactionForm(props: TransactionFormProps) {
               <select
                 value={values.accountId}
                 onChange={(event) => updateField("accountId", event.target.value)}
-                style={inputStyle}
+                className="control"
               >
                 <option value="">select account</option>
                 {accounts.map((account) => (
@@ -475,7 +469,7 @@ export function TransactionForm(props: TransactionFormProps) {
                 <select
                   value={values.categoryId}
                   onChange={(event) => updateField("categoryId", event.target.value)}
-                  style={inputStyle}
+                  className="control"
                 >
                   <option value="">select category</option>
                   {matchingCategories.map((category) => (
@@ -493,20 +487,13 @@ export function TransactionForm(props: TransactionFormProps) {
                 type="text"
                 value={values.merchant}
                 onChange={(event) => updateField("merchant", event.target.value)}
-                style={inputStyle}
+                className="control"
               />
             </label>
 
             <label className="field">
               <span className="field__label">split transaction</span>
-              <span
-                style={{
-                  ...inputStyle,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.6rem",
-                }}
-              >
+              <span className="control control--toggle">
                 <input
                   type="checkbox"
                   checked={values.isSplit}
@@ -529,7 +516,7 @@ export function TransactionForm(props: TransactionFormProps) {
               </p>
             </div>
 
-            <button type="button" onClick={addSplitRow} style={secondaryButtonStyle}>
+            <button type="button" onClick={addSplitRow} className="button button--secondary">
               add split row
             </button>
           </div>
@@ -543,7 +530,7 @@ export function TransactionForm(props: TransactionFormProps) {
                   onChange={(event) =>
                     updateSplitRow(split.id, "categoryId", event.target.value)
                   }
-                  style={inputStyle}
+                  className="control"
                 >
                   <option value="">select category</option>
                   {matchingCategories.map((category) => (
@@ -564,7 +551,7 @@ export function TransactionForm(props: TransactionFormProps) {
                   onChange={(event) =>
                     updateSplitRow(split.id, "amount", stripNegativeSign(event.target.value))
                   }
-                  style={inputStyle}
+                  className="control"
                 />
               </label>
 
@@ -576,7 +563,7 @@ export function TransactionForm(props: TransactionFormProps) {
                   onChange={(event) =>
                     updateSplitRow(split.id, "note", event.target.value)
                   }
-                  style={inputStyle}
+                  className="control"
                 />
               </label>
 
@@ -586,11 +573,7 @@ export function TransactionForm(props: TransactionFormProps) {
                   type="button"
                   onClick={() => removeSplitRow(split.id)}
                   disabled={values.splits.length <= 2}
-                  style={{
-                    ...secondaryButtonStyle,
-                    cursor: values.splits.length <= 2 ? "not-allowed" : "pointer",
-                    opacity: values.splits.length <= 2 ? 0.6 : 1,
-                  }}
+                  className="button button--secondary"
                 >
                   remove row
                 </button>
@@ -625,7 +608,7 @@ export function TransactionForm(props: TransactionFormProps) {
           rows={3}
           value={values.note}
           onChange={(event) => updateField("note", event.target.value)}
-          style={textAreaStyle}
+          className="control"
         />
       </label>
 
@@ -639,17 +622,13 @@ export function TransactionForm(props: TransactionFormProps) {
         <button
           type="submit"
           disabled={submitDisabled}
-          style={{
-            ...primaryButtonStyle,
-            cursor: submitDisabled ? "not-allowed" : "pointer",
-            opacity: submitDisabled ? 0.7 : 1,
-          }}
+          className="button button--primary"
         >
           {submitLabel}
         </button>
 
         {onCancel ? (
-          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
+          <button type="button" onClick={onCancel} className="button button--secondary">
             cancel
           </button>
         ) : null}

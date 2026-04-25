@@ -4,7 +4,6 @@ import { useAppStore } from "../../app/store";
 import { getCurrentMonth } from "../../lib/dates";
 import { formatCents, getBudgetRows, getMonthlySummary } from "../../lib/money";
 import { hasTransactionSplits } from "../../lib/transaction-splits";
-import { inputStyle, primaryButtonStyle } from "../components/style-constants";
 import { RecurringGenerationFeedback } from "../recurring/recurring-generation-feedback";
 
 function Card(props: {
@@ -181,7 +180,7 @@ export function DashboardPage() {
               type="month"
               value={month}
               onChange={(event) => setMonth(event.target.value)}
-              style={inputStyle}
+              className="control"
             />
           </label>
 
@@ -193,14 +192,14 @@ export function DashboardPage() {
               step="1"
               value={monthCount}
               onChange={(event) => setMonthCount(event.target.value)}
-              style={inputStyle}
+              className="control"
             />
           </label>
 
           <button
             type="button"
             onClick={handleGenerateRecurring}
-            style={primaryButtonStyle}
+            className="button button--primary"
           >
             generate recurring range
           </button>

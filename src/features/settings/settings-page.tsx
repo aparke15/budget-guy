@@ -20,13 +20,6 @@ import {
 } from "../../lib/transaction-splits";
 import type { Category, PersistedState } from "../../types";
 import { CategoryEditor } from "../components/editors";
-import {
-  compactDangerButtonStyle,
-  compactSecondaryButtonStyle,
-  dangerButtonStyle,
-  primaryButtonStyle,
-  secondaryButtonStyle,
-} from "../components/style-constants";
 import type { CategoryFormValues } from "../types";
 import {
   buildDeleteImpact,
@@ -241,7 +234,7 @@ function CategoriesSection(props: CategoriesSectionProps) {
                 <button
                   type="button"
                   onClick={() => startEditing(category)}
-                  style={compactSecondaryButtonStyle}
+                  className="button button--secondary button--compact"
                 >
                   edit
                 </button>
@@ -252,10 +245,10 @@ function CategoriesSection(props: CategoriesSectionProps) {
                       ? onRestore(category.id)
                       : onRequestArchive(category)
                   }
-                  style={
+                  className={
                     isCategoryArchived(category)
-                      ? compactSecondaryButtonStyle
-                      : compactDangerButtonStyle
+                      ? "button button--secondary button--compact"
+                      : "button button--danger button--compact"
                   }
                 >
                   {isCategoryArchived(category) ? "restore" : "archive"}
@@ -363,16 +356,11 @@ function DataManagementSection(props: DataManagementSectionProps) {
       </div>
 
       <div className="button-row">
-        <button type="button" onClick={handleExport} style={primaryButtonStyle}>
+        <button type="button" onClick={handleExport} className="button button--primary">
           export json backup
         </button>
 
-        <label
-          style={{
-            ...secondaryButtonStyle,
-            cursor: "pointer",
-          }}
-        >
+        <label className="button button--secondary">
           import json backup
           <input
             type="file"
@@ -391,7 +379,7 @@ function DataManagementSection(props: DataManagementSectionProps) {
               setImportSuccess("seed data restored");
             }
           }}
-          style={dangerButtonStyle}
+          className="button button--danger"
         >
           reset seed data
         </button>
@@ -483,13 +471,17 @@ export function SettingsPage() {
             </div>
 
             <div className="button-row">
-              <button type="button" onClick={handleConfirmDelete} style={dangerButtonStyle}>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="button button--danger"
+              >
                 confirm archive
               </button>
               <button
                 type="button"
                 onClick={() => setPendingDelete(null)}
-                style={secondaryButtonStyle}
+                className="button button--secondary"
               >
                 cancel
               </button>
