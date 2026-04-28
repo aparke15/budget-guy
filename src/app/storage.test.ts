@@ -6,6 +6,7 @@ import {
   exportPersistedStateJson,
   loadPersistedState,
   loadOrCreatePersistedState,
+  parsePersistedStateValue,
   parsePersistedStateJson,
   STORAGE_KEY,
 } from "./storage";
@@ -161,6 +162,21 @@ describe("storage helpers", () => {
     );
 
     expect(result).toEqual({
+      success: true,
+      data: createPersistedState({
+        ...LEGACY_PERSISTED_STATE_FIXTURE,
+        transactions: [
+          {
+            kind: "standard",
+            ...LEGACY_PERSISTED_STATE_FIXTURE.transactions[0],
+          },
+        ],
+      }),
+    });
+  });
+
+  it("parses unknown persisted payload values through the migration pipeline", () => {
+    expect(parsePersistedStateValue(LEGACY_PERSISTED_STATE_FIXTURE)).toEqual({
       success: true,
       data: createPersistedState({
         ...LEGACY_PERSISTED_STATE_FIXTURE,

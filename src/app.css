@@ -511,6 +511,25 @@ textarea.control {
 	color: var(--text-negative);
 }
 
+.settings-sync-summary {
+	font-size: 1.05rem;
+	line-height: 1.25;
+}
+
+.settings-sync-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem 1rem;
+	font-size: 0.9rem;
+	color: var(--text-muted);
+	overflow-wrap: anywhere;
+}
+
+.settings-sync-safety-box {
+	display: grid;
+	gap: 0.75rem;
+}
+
 .empty-state {
 	margin: 0;
 	padding: 1rem;

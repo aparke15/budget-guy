@@ -13,6 +13,7 @@
     "test:watch": "vitest --watch"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.0",
     "@tanstack/react-form": "^1.29.0",
     "date-fns": "^4.1.0",
     "prettier": "^3.8.3",

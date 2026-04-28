@@ -13,8 +13,10 @@ What it does today:
 - Lets you review account history and a recurring-based forecast.
 - Stores data in your browser's local storage on this device.
 - Uses transactions as the source of truth for actual money movement.
-- Lets you generate recurring transactions manually for a selected month.
+- Lets you generate recurring transactions manually for a selected month range.
 - Lets you export a JSON backup and import a replacement backup.
+- Lets you optionally sign in with a magic email link for explicit cross-device snapshot sync.
+- Lets you explicitly push local data to the cloud, pull cloud data to this device, or sync now.
 - Lets you switch between light and dark mode, with your preference saved on this device.
    - If you have not chosen a theme yet, the app follows your system preference on first load.
 
@@ -40,17 +42,18 @@ Recommended first-time setup:
 2. Add your accounts, such as checking, savings, cash, or credit card.
    - You can optionally set an opening balance and date.
    - For credit accounts, you can optionally set a credit limit.
-3. Open **Settings** and add your categories.
+3. Open **Categories** and add your categories.
    - Use **income** categories for paychecks or other income.
    - Use **expense** categories for spending categories like rent, groceries, or dining.
    - Archive categories you no longer want to assign to new activity instead of deleting history.
-4. If you have repeating income or bills, add recurring rules in **Recurring**.
+4. If you have repeating income or bills, add recurring rules in the **Recurring** subview inside **Transactions**.
 5. Open **Transactions** and start recording real transactions or transfers.
 6. Open **Budget** and enter planned monthly amounts for your expense categories.
 7. Use **Accounts** to review balances and account history.
 8. Use **Forecast** to review projected balances from recurring rules.
 9. Use **Dashboard** to review the month and manually generate recurring transactions when needed.
-10. Use the header theme toggle if you prefer light or dark mode.
+10. Open **Settings** if you want to export/import backups, reset seed data, or optionally enable cloud sync with a magic link.
+11. Use the header theme toggle if you prefer light or dark mode.
 
 If there is no saved data yet, the app starts with demo seed data so you can see how it works.
 
@@ -58,17 +61,17 @@ If there is no saved data yet, the app starts with demo seed data so you can see
 
 Use this order each month:
 
-1. **Check your setup in Accounts, Settings, and Recurring**
+1. **Check your setup in Accounts, Categories, and Transactions > Recurring**
    - Make sure the accounts and categories you need already exist.
    - Add or update opening balances if you are starting from an existing real-world balance.
    - Add a credit limit for credit accounts if you want available-credit display.
    - Add or update recurring rules before the month gets busy.
 
-2. **Generate recurring transactions for the month**
+2. **Generate recurring transactions for the month range you need**
    - Go to **Dashboard**.
-   - Pick the month.
+   - Pick the start month and month count.
    - Click **generate recurring**.
-   - This creates real transactions for active recurring rules that match that month.
+   - This creates real transactions for active recurring rules that match the selected range.
    - The app prevents duplicate recurring transactions for the same rule on the same date.
 
 3. **Record manual transactions as they happen**
@@ -162,13 +165,33 @@ Delete behavior on this page:
 - Deleting an account also deletes linked transactions and linked recurring rules.
 - The page shows a confirmation panel with the expected cascade impact before you confirm.
 
-### Recurring
+### Categories
 
-Use the recurring page to manage repeating income, bills, and transfers.
+Use the categories page to manage income and expense categories without losing history.
 
 What you can do:
-- Pick a month for manual recurring generation.
-- Click **generate recurring** for that month.
+- Add, edit, archive, and restore categories.
+- Review simple usage metadata before archiving.
+- Keep old categories available in history while hiding them from new-use pickers.
+
+Important behavior:
+- Category names must be unique.
+- Each category is either **income** or **expense**.
+- Archiving is the normal way to retire a category.
+- Archived categories keep linked transactions, split allocations, budgets, and recurring rules intact.
+- Archived categories remain visible in historical displays and in edit forms for existing records.
+- Archived categories are removed from new transaction, split, recurring-rule, and budget selection by default until restored.
+
+### Recurring
+
+Use the recurring tools inside the **Transactions** page to manage repeating income, bills, and transfers.
+
+Compatibility note:
+- The old **/recurring** route still exists, but it forwards into the transactions recurring subview.
+
+What you can do:
+- Pick a start month and month count for manual recurring generation.
+- Click **generate recurring** for the selected range.
 - Review summary counts for rules, active rules, and generated transactions.
 - Add, edit, duplicate, and delete recurring rules inline.
 - Create either **standard** recurring rules or **transfer** recurring rules.
@@ -325,29 +348,38 @@ Recommended use:
 
 ### Settings
 
-Use settings to manage the app's core setup.
+Use settings for data-management utilities and optional cloud sync.
 
 What you can do:
+- Sign in with a magic email link.
+- Sign out.
+- Review cloud sync status.
+- Push local data to the cloud.
+- Pull cloud data to this device.
+- Use **sync now** for the obvious safe action.
+- Export a local backup before a cloud pull.
 - Export a JSON backup.
 - Import a JSON backup that replaces the current dataset.
-- Add, edit, archive, and restore categories.
-- Review simple usage counts before archiving items.
 - Use **reset seed data**.
 
-#### Categories
-- Categories classify income and spending.
-- Category names must be unique.
-- Each category is either **income** or **expense**.
-- Archiving a category is the normal way to retire it.
-- Archived categories keep linked transactions, split allocations, budgets, and recurring rules intact.
-- Archived categories remain visible in historical displays and in edit forms for existing records.
-- Archived categories are removed from new transaction, split, recurring-rule, and budget selection by default until restored.
+#### Cloud sync
+- Local storage stays primary even if you sign in.
+- Signed-out use still works normally on one device.
+- If cloud sync is enabled, the app compares full local and remote snapshots.
+- Cloud sync is explicit and snapshot-based:
+   - **push local to cloud** overwrites the remote snapshot with this device's current local data.
+   - **pull cloud to this device** replaces this device's local data with the validated cloud snapshot.
+   - **sync now** chooses the obvious safe path when one side is clearly newer.
+- If the local and remote snapshots diverge, the app does not auto-merge them.
+- If a cloud pull could overwrite local data, the app shows **backup local before pull** so you can export a restore point first.
+- If Supabase env vars are missing or sync is not configured, the app disables auth/sync actions and keeps local-only use available.
 
 #### Backup import/export
 - **export json backup** downloads the full current persisted dataset.
 - **import json backup** replaces the current accounts, categories, transactions, budgets, and recurring rules.
 - Importing asks for confirmation first.
 - Import does not merge; it replaces.
+- **backup local before pull** uses the same export path as a normal JSON backup, just positioned next to the cloud pull workflow.
 
 #### Reset seed data
 - **reset seed data** is a user-facing reset action in settings.
@@ -358,11 +390,11 @@ What you can do:
 
 ## 5. How recurring transactions work
 
-Recurring rules are managed on **Recurring**, and they can be generated from **Recurring** or **Dashboard**.
+Recurring rules are managed in **Transactions > Recurring**, and they can be generated from the recurring subview or from **Dashboard**.
 
 Recommended recurring workflow:
 1. Create the needed accounts first, plus a category if you are creating a standard recurring rule.
-2. Add a recurring rule in **Recurring**.
+2. Add a recurring rule in **Transactions > Recurring**.
 3. Choose the correct kind and frequency:
    - standard or transfer
    - monthly
@@ -370,12 +402,12 @@ Recommended recurring workflow:
    - biweekly
    - yearly
 4. Make sure the rule is active.
-5. When you are ready to populate a month, go to **Dashboard**.
-6. Select the month.
+5. When you are ready to populate one or more months, go to **Dashboard** or **Transactions > Recurring**.
+6. Select the start month and month count.
 7. Click **generate recurring**.
 8. Review the created transactions on the **Transactions** page.
 
-You can also run **generate recurring** from the **Recurring** page if you are already working there.
+You can also run **generate recurring** from the recurring subview if you are already working there.
 
 Important behavior:
 - Generated recurring entries become normal saved transactions with source `recurring`.
@@ -412,8 +444,9 @@ Important behavior:
 This guide describes the app as it exists now.
 
 Current MVP limitations:
-- Data is stored locally in browser local storage on one device.
-- There is no account system or authentication.
+- Local storage is still the primary data store on this device.
+- Optional magic-link auth and one-user snapshot sync exist, but they are intentionally narrow and explicit.
+- There is no merge engine, realtime sync, or background sync.
 - There is no bank sync.
 - There is no CSV import.
 - Recurring rules do not auto-run; you must generate them manually.

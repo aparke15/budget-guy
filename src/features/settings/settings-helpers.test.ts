@@ -6,6 +6,8 @@ import {
   countRecurringRulesByAccountId,
   countById,
   createAccountFormValues,
+  getAccountOpeningBalanceFormValueCents,
+  normalizeAccountOpeningBalanceCents,
   parseAccountCreditLimitInput,
   normalizeEntityName,
   sortItemsByName,
@@ -85,6 +87,48 @@ describe("settings helpers", () => {
       openingBalance: "",
       openingBalanceDate: "2026-04-21",
     });
+  });
+
+  it("shows credit opening balances as positive owed amounts in the form", () => {
+    const account: Account = {
+      id: "acct-credit",
+      name: "card",
+      type: "credit",
+      creditLimitCents: 250000,
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    };
+
+    expect(
+      createAccountFormValues(
+        account,
+        {
+          id: "txn-opening",
+          kind: "opening-balance",
+          date: "2026-04-01",
+          amountCents: -12500,
+          accountId: account.id,
+          source: "manual",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        "2026-04-21"
+      )
+    ).toEqual({
+      name: "card",
+      type: "credit",
+      creditLimit: "2500.00",
+      openingBalance: "125.00",
+      openingBalanceDate: "2026-04-01",
+    });
+  });
+
+  it("stores credit opening balances with the opposite ledger sign", () => {
+    expect(normalizeAccountOpeningBalanceCents("checking", 12500)).toBe(12500);
+    expect(normalizeAccountOpeningBalanceCents("credit", 12500)).toBe(-12500);
+    expect(normalizeAccountOpeningBalanceCents("credit", -12500)).toBe(-12500);
+    expect(getAccountOpeningBalanceFormValueCents("credit", -12500)).toBe(12500);
+    expect(getAccountOpeningBalanceFormValueCents("credit", 12500)).toBe(12500);
   });
 
   it("parses optional credit limit input", () => {

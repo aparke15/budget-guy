@@ -16,7 +16,7 @@ export function formatCents(
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
-  }).format(amountCents / 100);
+  }).format(amountCents / 100).replace('-', '');
 }
 
 export function formatCentsForInput(amountCents: number): string {

@@ -95,6 +95,20 @@ export function getAccountOpeningBalanceTransaction(
   );
 }
 
+export function normalizeAccountOpeningBalanceCents(
+  accountType: Account["type"],
+  amountCents: number
+): number {
+  return accountType === "credit" ? -Math.abs(amountCents) : amountCents;
+}
+
+export function getAccountOpeningBalanceFormValueCents(
+  accountType: Account["type"],
+  amountCents: number
+): number {
+  return accountType === "credit" ? Math.abs(amountCents) : amountCents;
+}
+
 export function createAccountFormValues(
   account?: Account,
   openingBalanceTransaction?: Transaction,
@@ -108,7 +122,12 @@ export function createAccountFormValues(
         ? formatSignedCentsForInput(account.creditLimitCents)
         : "",
     openingBalance: openingBalanceTransaction
-      ? formatSignedCentsForInput(openingBalanceTransaction.amountCents)
+      ? formatSignedCentsForInput(
+          getAccountOpeningBalanceFormValueCents(
+            account?.type ?? "checking",
+            openingBalanceTransaction.amountCents
+          )
+        )
       : "",
     openingBalanceDate: openingBalanceTransaction?.date ?? today,
   };

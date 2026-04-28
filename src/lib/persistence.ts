@@ -48,6 +48,38 @@ function getValidationErrorMessage(error: z.ZodError, fallback: string): string 
   return error.issues[0]?.message ?? fallback;
 }
 
+function normalizeCreditOpeningBalanceTransactions(
+  state: LatestPersistedState
+): LatestPersistedState {
+  const creditAccountIds = new Set(
+    state.accounts
+      .filter((account) => account.type === "credit")
+      .map((account) => account.id)
+  );
+
+  if (creditAccountIds.size === 0) {
+    return state;
+  }
+
+  return {
+    ...state,
+    transactions: state.transactions.map((transaction) => {
+      if (
+        transaction.kind !== "opening-balance" ||
+        transaction.amountCents <= 0 ||
+        !creditAccountIds.has(transaction.accountId)
+      ) {
+        return transaction;
+      }
+
+      return {
+        ...transaction,
+        amountCents: -transaction.amountCents,
+      };
+    }),
+  };
+}
+
 export function detectPersistedStateVersion(input: unknown): number | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return null;
@@ -174,7 +206,7 @@ export function migratePersistedStateToLatest(
 
   return {
     success: true,
-    data: result.data,
+    data: normalizeCreditOpeningBalanceTransactions(result.data),
   };
 }
 

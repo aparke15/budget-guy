@@ -21,6 +21,8 @@ type ParsedPersistedStateResult =
 
 export { buildPersistedStateSnapshot, clearPersistedState, savePersistedState, STORAGE_KEY };
 
+export type { ParsedPersistedStateResult };
+
 export function exportPersistedStateJson(state: PersistedState): string {
   const result = latestPersistedStateSchema.safeParse(state);
 
@@ -31,10 +33,35 @@ export function exportPersistedStateJson(state: PersistedState): string {
   return JSON.stringify(result.data, null, 2);
 }
 
+export function downloadPersistedStateBackup(
+  state: PersistedState,
+  options: {
+    fileName?: string;
+  } = {}
+): void {
+  const json = exportPersistedStateJson(state);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = options.fileName ?? buildBackupFileName();
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function parsePersistedStateValue(
+  input: unknown
+): ParsedPersistedStateResult {
+  return migratePersistedStateToLatest(input);
+}
+
 export function parsePersistedStateJson(raw: string): ParsedPersistedStateResult {
   try {
     const parsed = JSON.parse(raw);
-    return migratePersistedStateToLatest(parsed);
+    return parsePersistedStateValue(parsed);
   } catch {
     return {
       success: false,

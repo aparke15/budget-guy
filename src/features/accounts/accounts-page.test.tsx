@@ -193,6 +193,49 @@ describe("accounts page opening-balance and delete flows", () => {
     ).toHaveLength(0);
   });
 
+  it("stores credit opening balances as owed amounts and reduces available credit", async () => {
+    const { AccountsPage, useAppStore } = await loadAccountsPage(createPersistedState());
+
+    render(<AccountsPage />);
+
+    const createForm = getFormBySubmitLabel("add account");
+
+    fireEvent.change(within(createForm).getByLabelText("name"), {
+      target: { value: "visa" },
+    });
+    fireEvent.change(within(createForm).getByLabelText("type"), {
+      target: { value: "credit" },
+    });
+    fireEvent.change(within(createForm).getByLabelText("credit limit"), {
+      target: { value: "1000.00" },
+    });
+    fireEvent.change(within(createForm).getByLabelText("opening balance"), {
+      target: { value: "200.00" },
+    });
+    fireEvent.change(within(createForm).getByLabelText("opening balance date"), {
+      target: { value: "2026-04-01" },
+    });
+    fireEvent.click(within(createForm).getByRole("button", { name: "add account" }));
+
+    expect(
+      useAppStore
+        .getState()
+        .transactions.filter((transaction) => transaction.kind === "opening-balance")
+    ).toEqual([
+      expect.objectContaining({
+        accountId: "acct-generated-uuid-1",
+        amountCents: -20000,
+        date: "2026-04-01",
+      }),
+    ]);
+
+    const balanceCell = screen.getAllByText("-$200.00")[0];
+
+    expect(balanceCell.className).toContain("text-negative");
+    expect(screen.getByText("$1,000.00")).toBeTruthy();
+    expect(screen.getByText("$800.00")).toBeTruthy();
+  });
+
   it("deletes an account from the page by cascading related transactions, transfer pairs, opening balances, and recurring rules", async () => {
     const persisted = createPersistedState({
       accounts: [

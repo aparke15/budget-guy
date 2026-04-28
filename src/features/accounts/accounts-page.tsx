@@ -19,6 +19,7 @@ import {
   createAccountFormValues,
   getAccountOpeningBalanceTransaction,
   normalizeEntityName,
+  normalizeAccountOpeningBalanceCents,
   parseAccountCreditLimitInput,
   parseAccountOpeningBalanceInput,
   sortItemsByName,
@@ -240,7 +241,13 @@ export function AccountsPage() {
         values.type === "credit"
           ? creditLimitInput.amountCents ?? undefined
           : undefined,
-      openingBalanceCents: openingBalanceInput.amountCents ?? undefined,
+      openingBalanceCents:
+        openingBalanceInput.amountCents != null
+          ? normalizeAccountOpeningBalanceCents(
+              values.type,
+              openingBalanceInput.amountCents
+            )
+          : undefined,
     };
   }
 

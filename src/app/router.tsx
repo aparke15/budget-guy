@@ -27,6 +27,12 @@ const BudgetPage = lazy(async () => {
   return { default: module.BudgetPage };
 });
 
+const CategoriesPage = lazy(async () => {
+  const module = await import("../features/categories/categories-page");
+
+  return { default: module.CategoriesPage };
+});
+
 const RecurringPage = lazy(async () => {
   const module = await import("../features/recurring/recurring-page");
 
@@ -73,6 +79,10 @@ export const appRoutes = [
       {
         path: "budgets",
         element: withRouteSuspense(<BudgetPage />),
+      },
+      {
+        path: "categories",
+        element: withRouteSuspense(<CategoriesPage />),
       },
       {
         path: "budget",

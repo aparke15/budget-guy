@@ -1,6 +1,7 @@
 import { buildLatestPersistedState } from "../lib/persistence";
 import { latestPersistedStateSchema } from "../lib/validation";
 import type { PersistedState, PersistedStateCollections } from "../types";
+import { updateLocalSnapshotInfo } from "./sync";
 
 export const STORAGE_KEY = "budget-mvp";
 
@@ -21,6 +22,7 @@ export function savePersistedState(state: PersistedState): void {
   }
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(result.data));
+  updateLocalSnapshotInfo(result.data);
 }
 
 export function clearPersistedState(): void {

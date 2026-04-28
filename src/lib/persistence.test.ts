@@ -132,6 +132,50 @@ describe("persistence migrations", () => {
     });
   });
 
+  it("normalizes positive credit opening balances when loading persisted state", () => {
+    const currentPersistedStateFixture = {
+      version: LATEST_PERSISTED_STATE_VERSION,
+      accounts: [
+        {
+          id: "acct-credit",
+          name: "visa",
+          type: "credit" as const,
+          creditLimitCents: 100000,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      categories: [],
+      transactions: [
+        {
+          id: "txn-opening",
+          kind: "opening-balance" as const,
+          date: "2026-04-01",
+          amountCents: 25000,
+          accountId: "acct-credit",
+          source: "manual" as const,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      budgets: [],
+      recurringRules: [],
+    };
+
+    expect(migratePersistedStateToLatest(currentPersistedStateFixture)).toEqual({
+      success: true,
+      data: {
+        ...currentPersistedStateFixture,
+        transactions: [
+          {
+            ...currentPersistedStateFixture.transactions[0],
+            amountCents: -25000,
+          },
+        ],
+      },
+    });
+  });
+
   it("migrates a v1 payload to v2 without changing transactions", () => {
     const result = migratePersistedStateToLatest(V1_PERSISTED_STATE_FIXTURE);
 
