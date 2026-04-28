@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 
-import { addDays, format, parseISO } from "date-fns";
-
 import { useAppStore } from "../../app/store";
 import { generateRecurringForRange } from "../../app/recurring-store-actions";
-import { getCurrentMonth } from "../../lib/dates";
+import { getCurrentMonth, getTodayDateKey } from "../../lib/dates";
 import {
+  DASHBOARD_EXPECTED_WINDOW,
   deriveExpectedOccurrences,
   getDueSoonExpectedOccurrences,
+  getExpectedOccurrenceIntervalForWindow,
   getExpectedOccurrenceDashboardSummary,
   type ExpectedOccurrence,
 } from "../../lib/expected-occurrences";
@@ -32,17 +32,6 @@ function Card(props: {
       <div className="summary-card__label">{props.title}</div>
       <div className="summary-card__value">{props.value}</div>
     </div>
-  );
-}
-
-function getEarliestRecurringStartDate(
-  recurringRules: Array<{ active: boolean; startDate: string }>,
-  fallbackDate: string
-) {
-  return recurringRules.reduce(
-    (earliest, rule) =>
-      rule.active && rule.startDate < earliest ? rule.startDate : earliest,
-    fallbackDate
   );
 }
 
@@ -104,9 +93,9 @@ export function DashboardPage() {
   const generationSummary = useAppStore(
     (state) => state.lastRecurringGenerationSummary
   );
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const dueSoonEndDate = useMemo(
-    () => format(addDays(parseISO(today), 7), "yyyy-MM-dd"),
+  const today = useMemo(() => getTodayDateKey(), []);
+  const operationalInterval = useMemo(
+    () => getExpectedOccurrenceIntervalForWindow(today, DASHBOARD_EXPECTED_WINDOW),
     [today]
   );
 
@@ -141,20 +130,27 @@ export function DashboardPage() {
       deriveExpectedOccurrences(
         recurringRules,
         transactions,
-        {
-          startDate: getEarliestRecurringStartDate(recurringRules, today),
-          endDate: dueSoonEndDate,
-        },
+        operationalInterval,
         today
       ),
-    [dueSoonEndDate, recurringRules, today, transactions]
+    [operationalInterval, recurringRules, today, transactions]
   );
   const operationalSummary = useMemo(
-    () => getExpectedOccurrenceDashboardSummary(operationalOccurrences, today),
+    () =>
+      getExpectedOccurrenceDashboardSummary(
+        operationalOccurrences,
+        today,
+        DASHBOARD_EXPECTED_WINDOW
+      ),
     [operationalOccurrences, today]
   );
   const dueSoonOccurrences = useMemo(
-    () => getDueSoonExpectedOccurrences(operationalOccurrences, today).slice(0, 6),
+    () =>
+      getDueSoonExpectedOccurrences(
+        operationalOccurrences,
+        today,
+        DASHBOARD_EXPECTED_WINDOW
+      ).slice(0, 6),
     [operationalOccurrences, today]
   );
 

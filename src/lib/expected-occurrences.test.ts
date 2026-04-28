@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ACCOUNTS_EXPECTED_WINDOW,
+  DASHBOARD_EXPECTED_WINDOW,
   deriveExpectedOccurrences,
   getDueSoonExpectedOccurrences,
+  getExpectedOccurrenceIntervalForWindow,
   getExpectedOccurrenceAccountEffects,
   getExpectedOccurrenceDashboardSummary,
+  getOperationalExpectedOccurrences,
 } from "./expected-occurrences";
 import type { RecurringRule, Transaction } from "../types";
 
@@ -274,14 +278,24 @@ describe("expected occurrence helpers", () => {
       "2026-05-01",
     ]);
 
-    expect(getExpectedOccurrenceDashboardSummary(occurrences, "2026-04-30")).toEqual({
+    expect(
+      getExpectedOccurrenceDashboardSummary(
+        occurrences,
+        "2026-04-30",
+        DASHBOARD_EXPECTED_WINDOW
+      )
+    ).toEqual({
       dueCount: 1,
       overdueCount: 1,
       nextSevenDaysCount: 2,
     });
 
     expect(
-      getDueSoonExpectedOccurrences(occurrences, "2026-04-30").map(
+      getDueSoonExpectedOccurrences(
+        occurrences,
+        "2026-04-30",
+        DASHBOARD_EXPECTED_WINDOW
+      ).map(
         (occurrence) => occurrence.id
       )
     ).toEqual([
@@ -289,6 +303,86 @@ describe("expected occurrence helpers", () => {
       "rule-insurance:2026-04-30",
       "rule-gym:2026-05-01",
       "rule-rent:2026-05-01",
+    ]);
+  });
+
+  it("builds bounded operational intervals from a reference date", () => {
+    expect(
+      getExpectedOccurrenceIntervalForWindow("2026-04-21", DASHBOARD_EXPECTED_WINDOW)
+    ).toEqual({
+      startDate: "2026-04-07",
+      endDate: "2026-04-28",
+    });
+
+    expect(
+      getExpectedOccurrenceIntervalForWindow("2026-04-21", ACCOUNTS_EXPECTED_WINDOW)
+    ).toEqual({
+      startDate: "2026-04-07",
+      endDate: "2026-05-21",
+    });
+  });
+
+  it("bounds overdue semantics and orders operational rows by relevance", () => {
+    const occurrences = deriveExpectedOccurrences(
+      recurringRules,
+      transactions,
+      {
+        startDate: "2026-03-01",
+        endDate: "2026-05-05",
+      },
+      "2026-04-21"
+    );
+
+    expect(
+      getOperationalExpectedOccurrences(
+        occurrences,
+        "2026-04-21",
+        DASHBOARD_EXPECTED_WINDOW
+      ).map((occurrence) => occurrence.id)
+    ).toEqual([
+      "rule-gym:2026-04-17",
+      "rule-paycheck:2026-04-15",
+      "rule-paycheck:2026-04-08",
+      "rule-paycheck:2026-04-22",
+      "rule-transfer:2026-04-25",
+    ]);
+
+    expect(
+      getExpectedOccurrenceDashboardSummary(
+        occurrences,
+        "2026-04-21",
+        DASHBOARD_EXPECTED_WINDOW
+      )
+    ).toEqual({
+      dueCount: 0,
+      overdueCount: 3,
+      nextSevenDaysCount: 2,
+    });
+  });
+
+  it("keeps due-soon limited to overdue items in lookback plus due and upcoming inside lookahead", () => {
+    const occurrences = deriveExpectedOccurrences(
+      recurringRules,
+      transactions,
+      {
+        startDate: "2026-03-01",
+        endDate: "2026-05-05",
+      },
+      "2026-04-21"
+    );
+
+    expect(
+      getDueSoonExpectedOccurrences(
+        occurrences,
+        "2026-04-21",
+        DASHBOARD_EXPECTED_WINDOW
+      ).map((occurrence) => occurrence.id)
+    ).toEqual([
+      "rule-gym:2026-04-17",
+      "rule-paycheck:2026-04-15",
+      "rule-paycheck:2026-04-08",
+      "rule-paycheck:2026-04-22",
+      "rule-transfer:2026-04-25",
     ]);
   });
 });

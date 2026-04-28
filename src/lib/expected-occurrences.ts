@@ -1,6 +1,6 @@
-import { addDays, addMonths, format, parseISO, startOfMonth } from "date-fns";
+import { addDays, addMonths, format, parseISO, startOfMonth, subDays } from "date-fns";
 
-import { getRecurringOccurrenceDatesForMonth } from "./dates";
+import { getRecurringOccurrenceDatesForMonth, getTodayDateKey } from "./dates";
 import type { RecurringRule, RecurringRuleKind, Transaction } from "../types";
 
 export type ExpectedOccurrenceStatus = "upcoming" | "due" | "overdue" | "matched";
@@ -34,6 +34,21 @@ export type ExpectedOccurrenceAccountEffect = {
 export type ExpectedOccurrenceInterval = {
   startDate: string;
   endDate: string;
+};
+
+export type ExpectedOccurrenceOperationalWindow = {
+  lookbackDays: number;
+  lookaheadDays: number;
+};
+
+export const DASHBOARD_EXPECTED_WINDOW: ExpectedOccurrenceOperationalWindow = {
+  lookbackDays: 14,
+  lookaheadDays: 7,
+};
+
+export const ACCOUNTS_EXPECTED_WINDOW: ExpectedOccurrenceOperationalWindow = {
+  lookbackDays: 14,
+  lookaheadDays: 30,
 };
 
 function getOccurrenceKey(recurringRuleId: string, date: string): string {
@@ -95,11 +110,89 @@ function compareOccurrences(left: ExpectedOccurrence, right: ExpectedOccurrence)
   return left.recurringRuleName.localeCompare(right.recurringRuleName);
 }
 
+function getOperationalStatusRank(status: ExpectedOccurrenceStatus): number {
+  switch (status) {
+    case "overdue":
+      return 0;
+    case "due":
+      return 1;
+    case "upcoming":
+      return 2;
+    case "matched":
+      return 3;
+  }
+}
+
+function compareByOperationalRelevance(
+  left: ExpectedOccurrence,
+  right: ExpectedOccurrence
+): number {
+  const statusRankComparison =
+    getOperationalStatusRank(left.status) - getOperationalStatusRank(right.status);
+
+  if (statusRankComparison !== 0) {
+    return statusRankComparison;
+  }
+
+  if (left.status === "overdue" && right.status === "overdue") {
+    const dateComparison = right.date.localeCompare(left.date);
+
+    if (dateComparison !== 0) {
+      return dateComparison;
+    }
+  }
+
+  if (left.status === "upcoming" && right.status === "upcoming") {
+    const dateComparison = left.date.localeCompare(right.date);
+
+    if (dateComparison !== 0) {
+      return dateComparison;
+    }
+  }
+
+  if (left.status === "due" && right.status === "due") {
+    const dateComparison = left.date.localeCompare(right.date);
+
+    if (dateComparison !== 0) {
+      return dateComparison;
+    }
+  }
+
+  return left.recurringRuleName.localeCompare(right.recurringRuleName);
+}
+
+export function getExpectedOccurrenceIntervalForWindow(
+  referenceDate: string,
+  window: ExpectedOccurrenceOperationalWindow
+): ExpectedOccurrenceInterval {
+  return {
+    startDate: format(subDays(parseISO(referenceDate), window.lookbackDays), "yyyy-MM-dd"),
+    endDate: format(addDays(parseISO(referenceDate), window.lookaheadDays), "yyyy-MM-dd"),
+  };
+}
+
+export function getOperationalExpectedOccurrences(
+  occurrences: ExpectedOccurrence[],
+  referenceDate: string,
+  window: ExpectedOccurrenceOperationalWindow
+): ExpectedOccurrence[] {
+  const interval = getExpectedOccurrenceIntervalForWindow(referenceDate, window);
+
+  return occurrences
+    .filter(
+      (occurrence) =>
+        isPendingOccurrence(occurrence.status) &&
+        occurrence.date >= interval.startDate &&
+        occurrence.date <= interval.endDate
+    )
+    .sort(compareByOperationalRelevance);
+}
+
 export function deriveExpectedOccurrences(
   recurringRules: RecurringRule[],
   transactions: Transaction[],
   interval: ExpectedOccurrenceInterval,
-  referenceDate = new Date().toISOString().slice(0, 10)
+  referenceDate = getTodayDateKey()
 ): ExpectedOccurrence[] {
   const months = getMonthsInInterval(interval.startDate, interval.endDate);
 
@@ -152,12 +245,15 @@ export function deriveExpectedOccurrences(
 export function getExpectedOccurrenceDashboardSummary(
   occurrences: ExpectedOccurrence[],
   referenceDate: string,
-  lookaheadDays = 7
+  window: ExpectedOccurrenceOperationalWindow = DASHBOARD_EXPECTED_WINDOW
 ): ExpectedOccurrenceDashboardSummary {
-  const lookaheadEndDate = addDays(parseISO(referenceDate), lookaheadDays);
-  const lookaheadEndKey = format(lookaheadEndDate, "yyyy-MM-dd");
+  const operationalOccurrences = getOperationalExpectedOccurrences(
+    occurrences,
+    referenceDate,
+    window
+  );
 
-  return occurrences.reduce<ExpectedOccurrenceDashboardSummary>(
+  return operationalOccurrences.reduce<ExpectedOccurrenceDashboardSummary>(
     (summary, occurrence) => {
       if (occurrence.status === "due") {
         summary.dueCount += 1;
@@ -168,9 +264,8 @@ export function getExpectedOccurrenceDashboardSummary(
       }
 
       if (
-        isPendingOccurrence(occurrence.status) &&
-        occurrence.date > referenceDate &&
-        occurrence.date <= lookaheadEndKey
+        occurrence.status === "upcoming" &&
+        occurrence.date > referenceDate
       ) {
         summary.nextSevenDaysCount += 1;
       }
@@ -188,17 +283,9 @@ export function getExpectedOccurrenceDashboardSummary(
 export function getDueSoonExpectedOccurrences(
   occurrences: ExpectedOccurrence[],
   referenceDate: string,
-  lookaheadDays = 7
+  window: ExpectedOccurrenceOperationalWindow = DASHBOARD_EXPECTED_WINDOW
 ): ExpectedOccurrence[] {
-  const lookaheadEndKey = format(addDays(parseISO(referenceDate), lookaheadDays), "yyyy-MM-dd");
-
-  return occurrences
-    .filter(
-      (occurrence) =>
-        isPendingOccurrence(occurrence.status) &&
-        (occurrence.date <= referenceDate || occurrence.date <= lookaheadEndKey)
-    )
-    .sort(compareOccurrences);
+  return getOperationalExpectedOccurrences(occurrences, referenceDate, window);
 }
 
 export function getExpectedOccurrenceAccountEffects(

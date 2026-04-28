@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState, type SubmitEvent } from "react";
 
-import { addDays, format, parseISO } from "date-fns";
-
 import { useAppStore } from "../../app/store";
 import {
   type AccountHistoryRange,
@@ -9,9 +7,12 @@ import {
   getAllAccountBalancesWithExpected,
   getDisplayedAccountBalanceCents,
 } from "../../lib/account-balances";
-import { getCurrentMonth } from "../../lib/dates";
+import { getCurrentMonth, getTodayDateKey } from "../../lib/dates";
 import {
+  ACCOUNTS_EXPECTED_WINDOW,
   deriveExpectedOccurrences,
+  getExpectedOccurrenceIntervalForWindow,
+  getOperationalExpectedOccurrences,
   type ExpectedOccurrence,
 } from "../../lib/expected-occurrences";
 import { createAccount } from "../../lib/factories";
@@ -42,17 +43,6 @@ const historyRanges: Array<{ value: AccountHistoryRange; label: string }> = [
 
 function getAccountTypeBadgeClass(type: Account["type"]) {
   return type === "credit" ? "badge badge--credit" : "badge badge--neutral";
-}
-
-function getEarliestRecurringStartDate(
-  recurringRules: Array<{ active: boolean; startDate: string }>,
-  fallbackDate: string
-) {
-  return recurringRules.reduce(
-    (earliest, rule) =>
-      rule.active && rule.startDate < earliest ? rule.startDate : earliest,
-    fallbackDate
-  );
 }
 
 function getExpectedStatusBadgeClass(status: ExpectedOccurrence["status"]) {
@@ -137,9 +127,9 @@ export function AccountsPage() {
   const [editError, setEditError] = useState("");
   const [expandedBalanceAccountId, setExpandedBalanceAccountId] = useState<string | null>(null);
   const [expandedHistoryMonth, setExpandedHistoryMonth] = useState<string | null>(null);
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const expectedWindowEndDate = useMemo(
-    () => format(addDays(parseISO(today), 30), "yyyy-MM-dd"),
+  const today = useMemo(() => getTodayDateKey(), []);
+  const expectedWindowInterval = useMemo(
+    () => getExpectedOccurrenceIntervalForWindow(today, ACCOUNTS_EXPECTED_WINDOW),
     [today]
   );
 
@@ -160,27 +150,20 @@ export function AccountsPage() {
       deriveExpectedOccurrences(
         recurringRules,
         transactions,
-        {
-          startDate: today,
-          endDate: expectedWindowEndDate,
-        },
+        expectedWindowInterval,
         today
       ),
-    [expectedWindowEndDate, recurringRules, today, transactions]
+    [expectedWindowInterval, recurringRules, today, transactions]
   );
 
   const pendingTimelineOccurrences = useMemo(
     () =>
-      deriveExpectedOccurrences(
-        recurringRules,
-        transactions,
-        {
-          startDate: getEarliestRecurringStartDate(recurringRules, today),
-          endDate: expectedWindowEndDate,
-        },
-        today
-      ).filter((occurrence) => occurrence.status !== "matched"),
-    [expectedWindowEndDate, recurringRules, today, transactions]
+      getOperationalExpectedOccurrences(
+        expectedBalanceOccurrences,
+        today,
+        ACCOUNTS_EXPECTED_WINDOW
+      ),
+    [expectedBalanceOccurrences, today]
   );
 
   const balanceRows = useMemo(

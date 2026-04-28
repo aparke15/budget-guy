@@ -45,6 +45,10 @@ export function getCurrentMonth(): string {
   return format(new Date(), "yyyy-MM");
 }
 
+export function getTodayDateKey(): string {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
 export function getMonthRange(startMonth: string, monthCount: number): string[] {
   if (monthCount <= 0 || !Number.isInteger(monthCount)) {
     return [];

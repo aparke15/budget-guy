@@ -370,15 +370,16 @@ describe("accounts page opening-balance and delete flows", () => {
     const creditRow = getBalanceTableRow("visa");
 
     expect(checkingRow.textContent).toContain("$1,000.00");
-    expect(checkingRow.textContent).toContain("$1,680.00");
+    expect(checkingRow.textContent).toContain("$1,560.00");
     expect(creditRow.textContent).toContain("$200.00");
-    expect(creditRow.textContent).toContain("$1,000.00");
+    expect(creditRow.textContent).toContain("$1,200.00");
     expect(creditRow.textContent).toContain("$1,200.00");
 
     const pendingList = screen.getByLabelText("pending recurring account list");
 
     expect(within(pendingList).getAllByText(/insurance \(archived\)/i)).toHaveLength(2);
     expect(within(pendingList).getByText(/2026-04-25/i)).toBeTruthy();
+    expect(within(pendingList).queryByText(/2026-04-01/i)).toBeNull();
   });
 
   it("deletes an account from the page by cascading related transactions, transfer pairs, opening balances, and recurring rules", async () => {

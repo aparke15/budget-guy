@@ -187,7 +187,7 @@ describe("dashboard expected occurrences", () => {
     expect(within(getSummaryCard("expenses")).getByText("$1,200.00")).toBeTruthy();
 
     expect(within(getSummaryCard("due today")).getByText("1")).toBeTruthy();
-    expect(within(getSummaryCard("overdue")).getByText("4")).toBeTruthy();
+    expect(within(getSummaryCard("overdue")).getByText("1")).toBeTruthy();
     expect(within(getSummaryCard("next 7 days")).getByText("1")).toBeTruthy();
 
     const dueSoonList = screen.getByLabelText("due soon recurring list");
@@ -197,5 +197,6 @@ describe("dashboard expected occurrences", () => {
     expect(within(dueSoonList).getByText(/2026-04-21/i)).toBeTruthy();
     expect(within(dueSoonList).getByText(/2026-04-25/i)).toBeTruthy();
     expect(within(dueSoonList).getByText(/checking → visa/i)).toBeTruthy();
+    expect(within(dueSoonList).queryByText(/2026-01-01/i)).toBeNull();
   });
 });

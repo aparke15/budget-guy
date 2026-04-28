@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { endOfMonth, format, parseISO } from "date-fns";
 
 import { useAppStore } from "../../app/store";
-import { getCurrentMonth, getMonthKey } from "../../lib/dates";
+import { getCurrentMonth, getMonthKey, getTodayDateKey } from "../../lib/dates";
 import {
   deriveExpectedOccurrences,
   type ExpectedOccurrence,
@@ -287,7 +287,7 @@ export function TransactionsPage() {
   const updateTransfer = useAppStore((state) => state.updateTransfer);
   const deleteTransfer = useAppStore((state) => state.deleteTransfer);
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => getTodayDateKey(), []);
 
   const categoryMap = useMemo<CategoryLookup>(
     () =>
