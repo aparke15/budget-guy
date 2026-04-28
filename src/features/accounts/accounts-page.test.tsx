@@ -107,6 +107,20 @@ function hasEntityCard(text: string) {
   );
 }
 
+function getBalanceTableRow(accountName: string) {
+  const row = Array.from(
+    document.querySelectorAll<HTMLTableRowElement>(
+      ".responsive-table-desktop tbody tr"
+    )
+  ).find((candidate) => candidate.textContent?.includes(accountName));
+
+  if (!row) {
+    throw new Error(`balance row not found for ${accountName}`);
+  }
+
+  return row;
+}
+
 describe("accounts page opening-balance and delete flows", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -229,11 +243,143 @@ describe("accounts page opening-balance and delete flows", () => {
       }),
     ]);
 
-    const balanceCell = screen.getAllByText("-$200.00")[0];
+    const balanceRow = getBalanceTableRow("visa");
 
-    expect(balanceCell.className).toContain("text-negative");
-    expect(screen.getByText("$1,000.00")).toBeTruthy();
-    expect(screen.getByText("$800.00")).toBeTruthy();
+    expect(balanceRow.textContent).toContain("$200.00");
+    expect(balanceRow.textContent).toContain("$1,000.00");
+    expect(balanceRow.textContent).toContain("$800.00$800.00");
+    expect(balanceRow.querySelector(".text-negative")).toBeTruthy();
+  });
+
+  it("shows posted and expected 30-day balances plus expected credit and pending recurring items", async () => {
+    const { AccountsPage } = await loadAccountsPage(
+      createPersistedState({
+        accounts: [
+          {
+            id: "acct-checking",
+            name: "checking",
+            type: "checking",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+          {
+            id: "acct-credit",
+            name: "visa",
+            type: "credit",
+            creditLimitCents: 120000,
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+        ],
+        categories: [
+          {
+            id: "cat-income",
+            name: "salary",
+            kind: "income",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+          {
+            id: "cat-archived-insurance",
+            name: "insurance",
+            kind: "expense",
+            archivedAt: "2026-04-10T00:00:00.000Z",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-10T00:00:00.000Z",
+          },
+        ],
+        transactions: [
+          {
+            id: "txn-paycheck",
+            kind: "standard",
+            date: "2026-04-15",
+            amountCents: 100000,
+            accountId: "acct-checking",
+            categoryId: "cat-income",
+            source: "manual",
+            createdAt: "2026-04-15T00:00:00.000Z",
+            updatedAt: "2026-04-15T00:00:00.000Z",
+          },
+          {
+            id: "txn-card-balance",
+            kind: "standard",
+            date: "2026-04-12",
+            amountCents: -20000,
+            accountId: "acct-credit",
+            categoryId: "cat-archived-insurance",
+            source: "manual",
+            createdAt: "2026-04-12T00:00:00.000Z",
+            updatedAt: "2026-04-12T00:00:00.000Z",
+          },
+        ],
+        recurringRules: [
+          {
+            id: "rule-salary",
+            kind: "standard",
+            name: "salary",
+            amountCents: 50000,
+            accountId: "acct-checking",
+            categoryId: "cat-income",
+            merchant: "Employer",
+            frequency: "monthly",
+            startDate: "2026-04-21",
+            active: true,
+            dayOfMonth: 21,
+            createdAt: "2026-04-21T00:00:00.000Z",
+            updatedAt: "2026-04-21T00:00:00.000Z",
+          },
+          {
+            id: "rule-insurance",
+            kind: "standard",
+            name: "insurance",
+            amountCents: -12000,
+            accountId: "acct-checking",
+            categoryId: "cat-archived-insurance",
+            merchant: "Carrier",
+            frequency: "monthly",
+            startDate: "2026-04-20",
+            active: true,
+            dayOfMonth: 20,
+            createdAt: "2026-04-20T00:00:00.000Z",
+            updatedAt: "2026-04-20T00:00:00.000Z",
+          },
+          {
+            id: "rule-payment",
+            kind: "transfer",
+            name: "card payment",
+            amountCents: 20000,
+            accountId: "acct-checking",
+            toAccountId: "acct-credit",
+            frequency: "monthly",
+            startDate: "2026-04-25",
+            active: true,
+            dayOfMonth: 25,
+            createdAt: "2026-04-25T00:00:00.000Z",
+            updatedAt: "2026-04-25T00:00:00.000Z",
+          },
+        ],
+      })
+    );
+
+    render(<AccountsPage />);
+
+    expect(screen.getByText("expected 30d")).toBeTruthy();
+    expect(screen.getByText("expected credit")).toBeTruthy();
+
+    const checkingRow = getBalanceTableRow("checking");
+    const creditRow = getBalanceTableRow("visa");
+
+    expect(checkingRow.textContent).toContain("$1,000.00");
+    expect(checkingRow.textContent).toContain("$1,560.00");
+    expect(creditRow.textContent).toContain("$200.00");
+    expect(creditRow.textContent).toContain("$1,200.00");
+    expect(creditRow.textContent).toContain("$1,200.00");
+
+    const pendingList = screen.getByLabelText("pending recurring account list");
+
+    expect(within(pendingList).getAllByText(/insurance \(archived\)/i)).toHaveLength(2);
+    expect(within(pendingList).getByText(/2026-04-25/i)).toBeTruthy();
+    expect(within(pendingList).queryByText(/2026-04-01/i)).toBeNull();
   });
 
   it("deletes an account from the page by cascading related transactions, transfer pairs, opening balances, and recurring rules", async () => {

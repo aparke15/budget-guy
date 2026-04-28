@@ -4,10 +4,17 @@ import { useAppStore } from "../../app/store";
 import {
   type AccountHistoryRange,
   getAccountMonthlyHistoryRows,
-  getAllAccountBalances,
+  getAllAccountBalancesWithExpected,
   getDisplayedAccountBalanceCents,
 } from "../../lib/account-balances";
-import { getCurrentMonth } from "../../lib/dates";
+import { getCurrentMonth, getTodayDateKey } from "../../lib/dates";
+import {
+  ACCOUNTS_EXPECTED_WINDOW,
+  deriveExpectedOccurrences,
+  getExpectedOccurrenceIntervalForWindow,
+  getOperationalExpectedOccurrences,
+  type ExpectedOccurrence,
+} from "../../lib/expected-occurrences";
 import { createAccount } from "../../lib/factories";
 import { formatCents } from "../../lib/money";
 import type { Account } from "../../types";
@@ -38,8 +45,61 @@ function getAccountTypeBadgeClass(type: Account["type"]) {
   return type === "credit" ? "badge badge--credit" : "badge badge--neutral";
 }
 
+function getExpectedStatusBadgeClass(status: ExpectedOccurrence["status"]) {
+  if (status === "overdue") {
+    return "badge badge--expense";
+  }
+
+  if (status === "due") {
+    return "badge badge--transfer";
+  }
+
+  return "badge badge--neutral";
+}
+
+function getExpectedCategoryLabel(
+  occurrence: ExpectedOccurrence,
+  categoryMap: Map<string, { name: string; archived: boolean }>
+) {
+  if (occurrence.kind === "transfer") {
+    return "transfer";
+  }
+
+  if (!occurrence.categoryId) {
+    return "uncategorized";
+  }
+
+  const category = categoryMap.get(occurrence.categoryId);
+
+  if (!category) {
+    return "unknown";
+  }
+
+  return category.archived ? `${category.name} (archived)` : category.name;
+}
+
+function getAccountOccurrenceDelta(
+  occurrence: ExpectedOccurrence,
+  accountId: string
+): number | null {
+  if (occurrence.kind === "transfer") {
+    if (occurrence.accountId === accountId) {
+      return -Math.abs(occurrence.amountCents);
+    }
+
+    if (occurrence.toAccountId === accountId) {
+      return Math.abs(occurrence.amountCents);
+    }
+
+    return null;
+  }
+
+  return occurrence.accountId === accountId ? occurrence.amountCents : null;
+}
+
 export function AccountsPage() {
   const accounts = useAppStore((state) => state.accounts);
+  const categories = useAppStore((state) => state.categories);
   const budgets = useAppStore((state) => state.budgets);
   const transactions = useAppStore((state) => state.transactions);
   const recurringRules = useAppStore((state) => state.recurringRules);
@@ -67,12 +127,53 @@ export function AccountsPage() {
   const [editError, setEditError] = useState("");
   const [expandedBalanceAccountId, setExpandedBalanceAccountId] = useState<string | null>(null);
   const [expandedHistoryMonth, setExpandedHistoryMonth] = useState<string | null>(null);
+  const today = useMemo(() => getTodayDateKey(), []);
+  const expectedWindowInterval = useMemo(
+    () => getExpectedOccurrenceIntervalForWindow(today, ACCOUNTS_EXPECTED_WINDOW),
+    [today]
+  );
 
   const sortedAccounts = useMemo(() => sortItemsByName(accounts), [accounts]);
+  const categoryMap = useMemo(
+    () =>
+      new Map(
+        categories.map((category) => [
+          category.id,
+          { name: category.name, archived: Boolean(category.archivedAt) },
+        ])
+      ),
+    [categories]
+  );
+
+  const expectedBalanceOccurrences = useMemo(
+    () =>
+      deriveExpectedOccurrences(
+        recurringRules,
+        transactions,
+        expectedWindowInterval,
+        today
+      ),
+    [expectedWindowInterval, recurringRules, today, transactions]
+  );
+
+  const pendingTimelineOccurrences = useMemo(
+    () =>
+      getOperationalExpectedOccurrences(
+        expectedBalanceOccurrences,
+        today,
+        ACCOUNTS_EXPECTED_WINDOW
+      ),
+    [expectedBalanceOccurrences, today]
+  );
 
   const balanceRows = useMemo(
-    () => getAllAccountBalances(sortedAccounts, transactions),
-    [sortedAccounts, transactions]
+    () =>
+      getAllAccountBalancesWithExpected(
+        sortedAccounts,
+        transactions,
+        expectedBalanceOccurrences
+      ),
+    [expectedBalanceOccurrences, sortedAccounts, transactions]
   );
 
   const openingBalanceTransactionMap = useMemo(
@@ -141,6 +242,16 @@ export function AccountsPage() {
           )
         : [],
     [historyRange, selectedAccountId, transactions]
+  );
+
+  const selectedAccountPendingOccurrences = useMemo(
+    () =>
+      selectedAccountId
+        ? pendingTimelineOccurrences
+            .filter((occurrence) => getAccountOccurrenceDelta(occurrence, selectedAccountId) != null)
+            .slice(0, 8)
+        : [],
+    [pendingTimelineOccurrences, selectedAccountId]
   );
 
   const creditAccountCount = useMemo(
@@ -418,18 +529,26 @@ export function AccountsPage() {
                   <tr>
                     <th>account</th>
                     <th>type</th>
-                    <th className="money-column">balance</th>
+                    <th className="money-column">posted balance</th>
+                    <th className="money-column">expected 30d</th>
                     <th className="money-column">limit</th>
                     <th className="money-column">available credit</th>
+                    <th className="money-column">expected credit</th>
                   </tr>
                 </thead>
                 <tbody>
                   {balanceRows.map((row) => {
                     const isSelected = row.accountId === selectedAccountId;
-                    const valueClass =
+                    const postedValueClass =
                       row.displayValueCents > 0
                         ? "text-positive"
                         : row.displayValueCents < 0
+                          ? "text-negative"
+                          : "";
+                    const expectedValueClass =
+                      row.expectedBalanceCents > 0
+                        ? "text-positive"
+                        : row.expectedBalanceCents < 0
                           ? "text-negative"
                           : "";
 
@@ -447,8 +566,11 @@ export function AccountsPage() {
                             {row.accountType}
                           </span>
                         </td>
-                        <td className={`money-column ${valueClass} font-bold`}>
+                        <td className={`money-column ${postedValueClass} font-bold`}>
                           {formatCents(row.displayValueCents)}
+                        </td>
+                        <td className={`money-column ${expectedValueClass} font-bold`}>
+                          {formatCents(row.expectedBalanceCents)}
                         </td>
                         <td className="money-column">
                           {row.creditLimitCents != null
@@ -458,6 +580,11 @@ export function AccountsPage() {
                         <td className="money-column">
                           {row.availableCreditCents != null
                             ? formatCents(row.availableCreditCents)
+                            : "—"}
+                        </td>
+                        <td className="money-column">
+                          {row.expectedAvailableCreditCents != null
+                            ? formatCents(row.expectedAvailableCreditCents)
                             : "—"}
                         </td>
                       </tr>
@@ -471,7 +598,7 @@ export function AccountsPage() {
               {balanceRows.map((row) => {
                 const isSelected = row.accountId === selectedAccountId;
                 const isExpanded = expandedBalanceAccountId === row.accountId;
-                const valueClass =
+                const postedValueClass =
                   row.displayValueCents > 0
                     ? "text-positive"
                     : row.displayValueCents < 0
@@ -502,7 +629,7 @@ export function AccountsPage() {
                           <div className="table-card__details">{row.accountName}</div>
                         </div>
 
-                        <div className={`table-card__amount ${valueClass} font-bold`}>
+                        <div className={`table-card__amount ${postedValueClass} font-bold`}>
                           {formatCents(row.displayValueCents)}
                         </div>
                       </div>
@@ -528,6 +655,11 @@ export function AccountsPage() {
                         </div>
 
                         <div className="table-card__meta-line">
+                          <span className="table-card__eyebrow">expected 30d</span>
+                          <span>{formatCents(row.expectedBalanceCents)}</span>
+                        </div>
+
+                        <div className="table-card__meta-line">
                           <span className="table-card__eyebrow">credit limit</span>
                           <span>
                             {row.creditLimitCents != null
@@ -540,6 +672,13 @@ export function AccountsPage() {
                           <div className="table-card__meta-line">
                             <span className="table-card__eyebrow">available credit</span>
                             <span>{formatCents(row.availableCreditCents)}</span>
+                          </div>
+                        ) : null}
+
+                        {row.expectedAvailableCreditCents != null ? (
+                          <div className="table-card__meta-line">
+                            <span className="table-card__eyebrow">expected credit</span>
+                            <span>{formatCents(row.expectedAvailableCreditCents)}</span>
                           </div>
                         ) : null}
                       </div>
@@ -698,6 +837,49 @@ export function AccountsPage() {
             </p>
           ) : null}
         </div>
+      </div>
+
+      <div className="section-card section-card--surface">
+        <div className="section-header">
+          <div className="section-title-group">
+            <h2 className="section-title">
+              {selectedAccount?.name ?? "selected account"} pending recurring
+            </h2>
+            <p className="section-subtitle">
+              projected-near-term only. these items are pending, not posted ledger activity.
+            </p>
+          </div>
+        </div>
+
+        {!selectedAccount ? (
+          <p className="empty-state">select an account to inspect pending recurring items.</p>
+        ) : selectedAccountPendingOccurrences.length === 0 ? (
+          <p className="empty-state">no pending recurring items for this account in the near term.</p>
+        ) : (
+          <ul className="list-compact list-compact--tight" aria-label="pending recurring account list">
+            {selectedAccountPendingOccurrences.map((occurrence) => {
+              const deltaCents = getAccountOccurrenceDelta(
+                occurrence,
+                selectedAccount.id
+              )!;
+
+              return (
+                <li key={`${selectedAccount.id}:${occurrence.id}`}>
+                  <span className={getExpectedStatusBadgeClass(occurrence.status)}>
+                    {occurrence.status}
+                  </span>{" "}
+                  {occurrence.date} · {occurrence.merchant ?? occurrence.recurringRuleName} · {" "}
+                  {occurrence.kind === "transfer"
+                    ? occurrence.accountId === selectedAccount.id
+                      ? `to ${accounts.find((account) => account.id === occurrence.toAccountId)?.name ?? "unknown"}`
+                      : `from ${accounts.find((account) => account.id === occurrence.accountId)?.name ?? "unknown"}`
+                    : getExpectedCategoryLabel(occurrence, categoryMap)} · {" "}
+                  {formatCents(deltaCents)}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       <div className="section-card section-card--surface">

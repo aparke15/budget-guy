@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   generateOccurrencesForMonth,
@@ -6,6 +6,7 @@ import {
   getMonthRange,
   getMonthKey,
   getMonthlyOccurrenceDate,
+  getTodayDateKey,
   getYearlyOccurrenceDate,
   isDateWithinBounds,
 } from "./dates";
@@ -30,8 +31,22 @@ function createRule(overrides: Partial<RecurringRule> = {}): RecurringRule {
 }
 
 describe("dates utilities", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("gets a month key from an iso date", () => {
     expect(getMonthKey("2026-04-21")).toBe("2026-04");
+  });
+
+  it("builds today's date key using local calendar formatting", () => {
+    vi.setSystemTime(new Date("2026-04-21T23:34:56"));
+
+    expect(getTodayDateKey()).toBe("2026-04-21");
   });
 
   it("builds a consecutive month range from a start month", () => {

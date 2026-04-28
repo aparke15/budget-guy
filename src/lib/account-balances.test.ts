@@ -3,12 +3,16 @@ import { describe, expect, it } from "vitest";
 import {
   getAvailableCreditCents,
   getAccountBalanceCents,
+  getAllAccountBalancesWithExpected,
   getAccountLedgerBalanceCents,
+  getExpectedAccountBalanceCents,
+  getExpectedAvailableCreditCents,
   getAccountMonthlyHistoryRows,
   getDisplayedAccountBalanceCents,
   getDisplayedAccountBalanceLabel,
   getAllAccountBalances,
 } from "./account-balances";
+import type { ExpectedOccurrence } from "./expected-occurrences";
 import type { Account, Budget, Transaction } from "../types";
 
 const accounts: Account[] = [
@@ -179,6 +183,42 @@ const budgets: Budget[] = [
     updatedAt: "2026-02-01T00:00:00.000Z",
   },
 ];
+const expectedOccurrences: ExpectedOccurrence[] = [
+  {
+    id: "rule-paycheck:2026-04-22",
+    recurringRuleId: "rule-paycheck",
+    recurringRuleName: "paycheck",
+    kind: "standard",
+    status: "upcoming",
+    date: "2026-04-22",
+    amountCents: 25000,
+    accountId: "acct-checking",
+    categoryId: "cat-salary",
+    merchant: "Employer",
+  },
+  {
+    id: "rule-transfer:2026-04-25",
+    recurringRuleId: "rule-transfer",
+    recurringRuleName: "card payment",
+    kind: "transfer",
+    status: "upcoming",
+    date: "2026-04-25",
+    amountCents: 4500,
+    accountId: "acct-checking",
+    toAccountId: "acct-credit",
+  },
+  {
+    id: "rule-matched:2026-04-18",
+    recurringRuleId: "rule-matched",
+    recurringRuleName: "already posted",
+    kind: "standard",
+    status: "matched",
+    date: "2026-04-18",
+    amountCents: -9999,
+    accountId: "acct-checking",
+    categoryId: "cat-food",
+  },
+];
 
 describe("account balance helpers", () => {
   it("calculates current balance per account from transactions only", () => {
@@ -219,6 +259,77 @@ describe("account balance helpers", () => {
         displayValueCents: -20000,
         creditLimitCents: 200000,
         availableCreditCents: 180000,
+      },
+    ]);
+  });
+
+  it("adds pending expected deltas on top of posted balances without changing posted semantics", () => {
+    expect(getAccountBalanceCents(transactions, "acct-checking")).toBe(86000);
+    expect(
+      getExpectedAccountBalanceCents(
+        transactions,
+        expectedOccurrences,
+        "acct-checking"
+      )
+    ).toBe(106500);
+    expect(
+      getExpectedAccountBalanceCents(transactions, expectedOccurrences, "acct-credit")
+    ).toBe(-15500);
+  });
+
+  it("derives expected available credit from the projected near-term balance", () => {
+    expect(
+      getExpectedAvailableCreditCents(
+        accounts[2]!,
+        transactions,
+        expectedOccurrences,
+        "acct-credit"
+      )
+    ).toBe(184500);
+  });
+
+  it("builds additive account balance rows with posted and expected values side by side", () => {
+    expect(
+      getAllAccountBalancesWithExpected(accounts, transactions, expectedOccurrences)
+    ).toEqual([
+      {
+        accountId: "acct-checking",
+        accountName: "Checking",
+        accountType: "checking",
+        balanceCents: 86000,
+        displayLabel: "balance",
+        displayValueCents: 86000,
+        creditLimitCents: undefined,
+        availableCreditCents: undefined,
+        expectedDeltaCents: 20500,
+        expectedBalanceCents: 106500,
+        expectedAvailableCreditCents: undefined,
+      },
+      {
+        accountId: "acct-savings",
+        accountName: "Savings",
+        accountType: "savings",
+        balanceCents: 35000,
+        displayLabel: "balance",
+        displayValueCents: 35000,
+        creditLimitCents: undefined,
+        availableCreditCents: undefined,
+        expectedDeltaCents: 0,
+        expectedBalanceCents: 35000,
+        expectedAvailableCreditCents: undefined,
+      },
+      {
+        accountId: "acct-credit",
+        accountName: "Visa",
+        accountType: "credit",
+        balanceCents: -20000,
+        displayLabel: "balance",
+        displayValueCents: -20000,
+        creditLimitCents: 200000,
+        availableCreditCents: 180000,
+        expectedDeltaCents: 4500,
+        expectedBalanceCents: -15500,
+        expectedAvailableCreditCents: 184500,
       },
     ]);
   });
