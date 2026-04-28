@@ -1,6 +1,7 @@
 import { format, parseISO, subMonths } from "date-fns";
 
 import { getCurrentMonth, getMonthKey } from "./dates";
+import { getExpectedOccurrenceDeltaForAccount, type ExpectedOccurrence } from "./expected-occurrences";
 import type { Account, Transaction } from "../types";
 
 export type AccountHistoryRange = "6" | "12" | "all";
@@ -22,6 +23,12 @@ export type AccountMonthlyHistoryRow = {
   outflowsCents: number;
   netChangeCents: number;
   closingBalanceCents: number;
+};
+
+export type ExpectedAccountBalanceRow = AccountBalanceRow & {
+  expectedDeltaCents: number;
+  expectedBalanceCents: number;
+  expectedAvailableCreditCents?: number;
 };
 
 export function getAccountLedgerBalanceCents(
@@ -82,6 +89,63 @@ export function getAllAccountBalances(
       displayValueCents: getDisplayedAccountBalanceCents(account, balanceCents),
       creditLimitCents: account.creditLimitCents,
       availableCreditCents: getAvailableCreditCents(account, balanceCents),
+    };
+  });
+}
+
+export function getExpectedAccountDeltaCents(
+  expectedOccurrences: ExpectedOccurrence[],
+  accountId: string
+): number {
+  return getExpectedOccurrenceDeltaForAccount(expectedOccurrences, accountId);
+}
+
+export function getExpectedAccountBalanceCents(
+  transactions: Transaction[],
+  expectedOccurrences: ExpectedOccurrence[],
+  accountId: string
+): number {
+  return (
+    getAccountBalanceCents(transactions, accountId) +
+    getExpectedAccountDeltaCents(expectedOccurrences, accountId)
+  );
+}
+
+export function getExpectedAvailableCreditCents(
+  account: Pick<Account, "type" | "creditLimitCents">,
+  transactions: Transaction[],
+  expectedOccurrences: ExpectedOccurrence[],
+  accountId: string
+): number | undefined {
+  return getAvailableCreditCents(
+    account,
+    getExpectedAccountBalanceCents(transactions, expectedOccurrences, accountId)
+  );
+}
+
+export function getAllAccountBalancesWithExpected(
+  accounts: Account[],
+  transactions: Transaction[],
+  expectedOccurrences: ExpectedOccurrence[]
+): ExpectedAccountBalanceRow[] {
+  return getAllAccountBalances(accounts, transactions).map((row) => {
+    const expectedDeltaCents = getExpectedAccountDeltaCents(
+      expectedOccurrences,
+      row.accountId
+    );
+    const expectedBalanceCents = row.balanceCents + expectedDeltaCents;
+
+    return {
+      ...row,
+      expectedDeltaCents,
+      expectedBalanceCents,
+      expectedAvailableCreditCents: getAvailableCreditCents(
+        {
+          type: row.accountType,
+          creditLimitCents: row.creditLimitCents,
+        },
+        expectedBalanceCents
+      ),
     };
   });
 }

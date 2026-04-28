@@ -1,8 +1,16 @@
 import { useMemo, useState } from "react";
 
+import { addDays, format, parseISO } from "date-fns";
+
 import { useAppStore } from "../../app/store";
 import { generateRecurringForRange } from "../../app/recurring-store-actions";
 import { getCurrentMonth } from "../../lib/dates";
+import {
+  deriveExpectedOccurrences,
+  getDueSoonExpectedOccurrences,
+  getExpectedOccurrenceDashboardSummary,
+  type ExpectedOccurrence,
+} from "../../lib/expected-occurrences";
 import { formatCents, getBudgetRows, getMonthlySummary } from "../../lib/money";
 import { hasTransactionSplits } from "../../lib/transaction-splits";
 import { RecurringGenerationFeedback } from "../recurring/recurring-generation-feedback";
@@ -27,6 +35,62 @@ function Card(props: {
   );
 }
 
+function getEarliestRecurringStartDate(
+  recurringRules: Array<{ active: boolean; startDate: string }>,
+  fallbackDate: string
+) {
+  return recurringRules.reduce(
+    (earliest, rule) =>
+      rule.active && rule.startDate < earliest ? rule.startDate : earliest,
+    fallbackDate
+  );
+}
+
+function getExpectedStatusBadgeClass(status: ExpectedOccurrence["status"]) {
+  if (status === "overdue") {
+    return "badge badge--expense";
+  }
+
+  if (status === "due") {
+    return "badge badge--transfer";
+  }
+
+  return "badge badge--neutral";
+}
+
+function getExpectedCategoryLabel(
+  occurrence: ExpectedOccurrence,
+  categoryMap: Map<string, { name: string; archived: boolean }>
+) {
+  if (occurrence.kind === "transfer") {
+    return "transfer";
+  }
+
+  if (!occurrence.categoryId) {
+    return "uncategorized";
+  }
+
+  const category = categoryMap.get(occurrence.categoryId);
+
+  if (!category) {
+    return "unknown";
+  }
+
+  return category.archived ? `${category.name} (archived)` : category.name;
+}
+
+function getDueSoonDetails(
+  occurrence: ExpectedOccurrence,
+  accountMap: Map<string, string>,
+  categoryMap: Map<string, { name: string; archived: boolean }>
+) {
+  if (occurrence.kind === "transfer") {
+    return `${accountMap.get(occurrence.accountId) ?? "unknown"} → ${accountMap.get(occurrence.toAccountId ?? "") ?? "unknown"}`;
+  }
+
+  return `${getExpectedCategoryLabel(occurrence, categoryMap)} · ${accountMap.get(occurrence.accountId) ?? "unknown"}`;
+}
+
 export function DashboardPage() {
   const [month, setMonth] = useState(getCurrentMonth());
   const [monthCount, setMonthCount] = useState("12");
@@ -36,8 +100,14 @@ export function DashboardPage() {
   const budgets = useAppStore((state) => state.budgets);
   const categories = useAppStore((state) => state.categories);
   const accounts = useAppStore((state) => state.accounts);
+  const recurringRules = useAppStore((state) => state.recurringRules);
   const generationSummary = useAppStore(
     (state) => state.lastRecurringGenerationSummary
+  );
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const dueSoonEndDate = useMemo(
+    () => format(addDays(parseISO(today), 7), "yyyy-MM-dd"),
+    [today]
   );
 
   const summary = useMemo(
@@ -53,12 +123,39 @@ export function DashboardPage() {
   const overBudget = budgetRows.filter((row) => row.overBudget);
   const recentTransactions = transactions.slice(0, 8);
   const categoryMap = useMemo(
-    () => new Map(categories.map((category) => [category.id, category.name])),
+    () =>
+      new Map(
+        categories.map((category) => [
+          category.id,
+          { name: category.name, archived: Boolean(category.archivedAt) },
+        ])
+      ),
     [categories]
   );
   const accountMap = useMemo(
     () => new Map(accounts.map((account) => [account.id, account.name])),
     [accounts]
+  );
+  const operationalOccurrences = useMemo(
+    () =>
+      deriveExpectedOccurrences(
+        recurringRules,
+        transactions,
+        {
+          startDate: getEarliestRecurringStartDate(recurringRules, today),
+          endDate: dueSoonEndDate,
+        },
+        today
+      ),
+    [dueSoonEndDate, recurringRules, today, transactions]
+  );
+  const operationalSummary = useMemo(
+    () => getExpectedOccurrenceDashboardSummary(operationalOccurrences, today),
+    [operationalOccurrences, today]
+  );
+  const dueSoonOccurrences = useMemo(
+    () => getDueSoonExpectedOccurrences(operationalOccurrences, today).slice(0, 6),
+    [operationalOccurrences, today]
   );
 
   function toggleExpandedRecentTransaction(transactionId: string) {
@@ -91,7 +188,7 @@ export function DashboardPage() {
     }
 
     return transaction.categoryId
-      ? categoryMap.get(transaction.categoryId) ?? "unknown"
+      ? categoryMap.get(transaction.categoryId)?.name ?? "unknown"
       : "—";
   }
 
@@ -221,7 +318,42 @@ export function DashboardPage() {
         />
       </div>
 
+      <div className="summary-grid">
+        <Card title="due today" value={String(operationalSummary.dueCount)} />
+        <Card
+          title="overdue"
+          value={String(operationalSummary.overdueCount)}
+          tone={operationalSummary.overdueCount > 0 ? "bad" : "default"}
+        />
+        <Card title="next 7 days" value={String(operationalSummary.nextSevenDaysCount)} />
+      </div>
+
       <div className="summary-grid summary-grid--wide">
+        <div className="section-card">
+          <h2 className="section-title">due soon</h2>
+
+          {dueSoonOccurrences.length === 0 ? (
+            <p className="empty-state">no pending recurring items in the next week.</p>
+          ) : (
+            <ul className="list-compact list-compact--tight" aria-label="due soon recurring list">
+              {dueSoonOccurrences.map((occurrence) => (
+                <li key={occurrence.id}>
+                  <span className={getExpectedStatusBadgeClass(occurrence.status)}>
+                    {occurrence.status}
+                  </span>{" "}
+                  {occurrence.date} · {occurrence.merchant ?? occurrence.recurringRuleName} · {" "}
+                  {getDueSoonDetails(occurrence, accountMap, categoryMap)} · {" "}
+                  {formatCents(
+                    occurrence.kind === "transfer"
+                      ? -Math.abs(occurrence.amountCents)
+                      : occurrence.amountCents
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <div className="section-card">
           <h2 className="section-title">over budget</h2>
 

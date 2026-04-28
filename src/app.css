@@ -583,6 +583,14 @@ textarea.control {
 	border-bottom: none;
 }
 
+.app-table tbody tr.activity-row--expected td {
+	background: color-mix(in srgb, var(--bg-subtle) 62%, transparent);
+}
+
+.app-table tbody tr.activity-row--expected td:first-child {
+	box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-accent) 65%, transparent);
+}
+
 .table-row--selected {
 	background: var(--bg-muted);
 }
@@ -620,6 +628,13 @@ textarea.control {
 	border-color: color-mix(in srgb, var(--color-opening) 24%, var(--border-default));
 	box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-opening) 55%, transparent),
 		var(--shadow-card);
+}
+
+.transaction-card--expected {
+	border-color: color-mix(in srgb, var(--color-accent) 18%, var(--border-default));
+	box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-accent) 45%, transparent),
+		var(--shadow-card);
+	background: color-mix(in srgb, var(--bg-card) 82%, var(--color-accent-surface));
 }
 
 .transaction-card__top,

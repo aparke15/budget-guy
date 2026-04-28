@@ -11,6 +11,7 @@ type MockStoreState = {
   transactions: PersistedState["transactions"];
   categories: PersistedState["categories"];
   accounts: PersistedState["accounts"];
+  recurringRules: PersistedState["recurringRules"];
   addTransaction: ReturnType<typeof vi.fn>;
   updateTransaction: ReturnType<typeof vi.fn>;
   deleteTransaction: ReturnType<typeof vi.fn>;
@@ -37,6 +38,7 @@ function createStoreState(overrides: Partial<MockStoreState> = {}): MockStoreSta
     transactions: [],
     categories: [],
     accounts: [],
+    recurringRules: [],
     addTransaction: vi.fn(),
     updateTransaction: vi.fn(),
     deleteTransaction: vi.fn(),
@@ -180,5 +182,93 @@ describe("transactions page recurring navigation", () => {
 
     expect(actionCell).toBeTruthy();
     expect(actionCell?.querySelector("button")).toBeNull();
+  });
+
+  it("shows pending expected rows, suppresses matched expected rows, and preserves archived category labels", () => {
+    storeState = createStoreState({
+      accounts: [
+        {
+          id: "acct-checking",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      categories: [
+        {
+          id: "cat-rent",
+          name: "rent",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "cat-archived-insurance",
+          name: "insurance",
+          kind: "expense",
+          archivedAt: "2026-04-10T00:00:00.000Z",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-rent",
+          kind: "standard",
+          name: "rent",
+          amountCents: -120000,
+          accountId: "acct-checking",
+          categoryId: "cat-rent",
+          merchant: "Landlord",
+          frequency: "monthly",
+          startDate: "2026-01-05",
+          active: true,
+          dayOfMonth: 5,
+          createdAt: "2026-01-05T00:00:00.000Z",
+          updatedAt: "2026-01-05T00:00:00.000Z",
+        },
+        {
+          id: "rule-insurance",
+          kind: "standard",
+          name: "insurance",
+          amountCents: -15000,
+          accountId: "acct-checking",
+          categoryId: "cat-archived-insurance",
+          merchant: "Carrier",
+          frequency: "monthly",
+          startDate: "2026-04-25",
+          active: true,
+          dayOfMonth: 25,
+          createdAt: "2026-04-25T00:00:00.000Z",
+          updatedAt: "2026-04-25T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-rent",
+          kind: "standard",
+          date: "2026-04-05",
+          amountCents: -120000,
+          accountId: "acct-checking",
+          categoryId: "cat-rent",
+          merchant: "Landlord",
+          source: "recurring",
+          recurringRuleId: "rule-rent",
+          createdAt: "2026-04-05T00:00:00.000Z",
+          updatedAt: "2026-04-05T00:00:00.000Z",
+        },
+      ],
+    });
+
+    renderPage();
+
+    const ledgerSection = screen.getByText("ledger").closest(".section-card");
+
+    expect(ledgerSection?.textContent).toContain("2 ledger rows in 2026-04");
+    expect(ledgerSection?.textContent).toContain("Carrier");
+    expect(ledgerSection?.textContent).toContain("insurance (archived)");
+    expect(ledgerSection?.textContent).toContain("pending recurring");
+    expect(screen.getAllByRole("button", { name: "edit rule" }).length).toBeGreaterThan(0);
   });
 });

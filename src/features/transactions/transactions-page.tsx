@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { endOfMonth, format, parseISO } from "date-fns";
+
 import { useAppStore } from "../../app/store";
-import { getCurrentMonth } from "../../lib/dates";
+import { getCurrentMonth, getMonthKey } from "../../lib/dates";
+import {
+  deriveExpectedOccurrences,
+  type ExpectedOccurrence,
+} from "../../lib/expected-occurrences";
 import { formatCents } from "../../lib/money";
 import type { TransactionFormSubmission } from "../types";
 import { RecurringManagementSection } from "../recurring/recurring-management-section";
@@ -17,60 +23,221 @@ import {
 
 type TransactionsTab = "activity" | "recurring";
 
+type ExpectedActivityRow = {
+  kind: "expected";
+  id: string;
+  occurrence: ExpectedOccurrence;
+};
+
+type PostedActivityRow = {
+  kind: "posted";
+  id: string;
+  row: TransactionListRow;
+};
+
+type ActivityLedgerRow = PostedActivityRow | ExpectedActivityRow;
+
+type CategoryLookup = Map<string, { name: string; archived: boolean }>;
+
 function getTransactionsTab(value: string | null): TransactionsTab {
   return value === "recurring" ? "recurring" : "activity";
 }
 
-function getTransactionDetails(row: TransactionListRow) {
-  if (row.type === "transfer") {
-    return `${row.fromAccountName} → ${row.toAccountName}`;
+function getExpectedStatusBadgeClass(status: ExpectedOccurrence["status"]) {
+  if (status === "overdue") {
+    return "badge badge--expense";
   }
 
-  if (row.type === "opening-balance") {
-    return "opening balance";
+  if (status === "due") {
+    return "badge badge--transfer";
   }
 
-  return row.merchant ?? "—";
+  return "badge badge--neutral";
 }
 
-function getTransactionCategoryLabel(
-  row: TransactionListRow,
-  categoryMap: Map<string, string>
+function getExpectedCategoryLabel(
+  occurrence: ExpectedOccurrence,
+  categoryMap: CategoryLookup
 ) {
-  if (row.type === "transfer") {
+  if (occurrence.kind === "transfer") {
     return "transfer";
   }
 
-  if (row.type === "opening-balance") {
+  if (!occurrence.categoryId) {
+    return "uncategorized";
+  }
+
+  const category = categoryMap.get(occurrence.categoryId);
+
+  if (!category) {
+    return "unknown";
+  }
+
+  return category.archived ? `${category.name} (archived)` : category.name;
+}
+
+function filterExpectedOccurrences(
+  occurrences: ExpectedOccurrence[],
+  filters: TransactionFilters,
+  accountMap: Map<string, string>,
+  categoryMap: CategoryLookup
+) {
+  const normalizedSearch = filters.search.trim().toLowerCase();
+
+  return occurrences.filter((occurrence) => {
+    if (getMonthKey(occurrence.date) !== filters.month) {
+      return false;
+    }
+
+    if (filters.accountId) {
+      if (
+        occurrence.kind === "transfer" &&
+        occurrence.accountId !== filters.accountId &&
+        occurrence.toAccountId !== filters.accountId
+      ) {
+        return false;
+      }
+
+      if (occurrence.kind === "standard" && occurrence.accountId !== filters.accountId) {
+        return false;
+      }
+    }
+
+    if (filters.categoryId) {
+      if (occurrence.kind !== "standard" || occurrence.categoryId !== filters.categoryId) {
+        return false;
+      }
+    }
+
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    const searchValue = [
+      occurrence.recurringRuleName,
+      occurrence.merchant ?? "",
+      occurrence.note ?? "",
+      accountMap.get(occurrence.accountId) ?? "",
+      occurrence.toAccountId ? accountMap.get(occurrence.toAccountId) ?? "" : "",
+      getExpectedCategoryLabel(occurrence, categoryMap),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return searchValue.includes(normalizedSearch);
+  });
+}
+
+function sortActivityLedgerRows(left: ActivityLedgerRow, right: ActivityLedgerRow) {
+  const dateComparison = right.kind === "posted"
+    ? (left.kind === "posted"
+        ? right.row.date.localeCompare(left.row.date)
+        : right.row.date.localeCompare(left.occurrence.date))
+    : (left.kind === "posted"
+        ? right.occurrence.date.localeCompare(left.row.date)
+        : right.occurrence.date.localeCompare(left.occurrence.date));
+
+  if (dateComparison !== 0) {
+    return dateComparison;
+  }
+
+  if (left.kind !== right.kind) {
+    return left.kind === "posted" ? -1 : 1;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+function getActivityDetails(row: ActivityLedgerRow) {
+  if (row.kind === "expected") {
+    if (row.occurrence.kind === "transfer") {
+      return row.occurrence.recurringRuleName;
+    }
+
+    return row.occurrence.merchant ?? row.occurrence.recurringRuleName;
+  }
+
+  const postedRow = row.row;
+
+  if (postedRow.type === "transfer") {
+    return `${postedRow.fromAccountName} → ${postedRow.toAccountName}`;
+  }
+
+  if (postedRow.type === "opening-balance") {
     return "opening balance";
   }
 
-  if (row.splits?.length) {
-    return `split · ${row.splits.length} categories`;
-  }
-
-  return row.categoryId ? categoryMap.get(row.categoryId) ?? "unknown" : "unknown";
+  return postedRow.merchant ?? "—";
 }
 
-function getTransactionAccountLabel(row: TransactionListRow) {
-  if (row.type === "transfer") {
-    return `${row.fromAccountName} → ${row.toAccountName}`;
+function getActivityCategoryLabel(
+  row: ActivityLedgerRow,
+  categoryMap: CategoryLookup
+) {
+  if (row.kind === "expected") {
+    return getExpectedCategoryLabel(row.occurrence, categoryMap);
   }
 
-  return row.accountName;
+  const postedRow = row.row;
+
+  if (postedRow.type === "transfer") {
+    return "transfer";
+  }
+
+  if (postedRow.type === "opening-balance") {
+    return "opening balance";
+  }
+
+  if (postedRow.splits?.length) {
+    return `split · ${postedRow.splits.length} categories`;
+  }
+
+  return postedRow.categoryId
+    ? categoryMap.get(postedRow.categoryId)?.name ?? "unknown"
+    : "unknown";
 }
 
-function getTransactionAmountClass(row: TransactionListRow) {
-  if (row.type === "transfer") {
+function getActivityAccountLabel(row: ActivityLedgerRow, accountMap: Map<string, string>) {
+  if (row.kind === "expected") {
+    if (row.occurrence.kind === "transfer") {
+      return `${accountMap.get(row.occurrence.accountId) ?? "unknown"} → ${accountMap.get(row.occurrence.toAccountId ?? "") ?? "unknown"}`;
+    }
+
+    return accountMap.get(row.occurrence.accountId) ?? "unknown";
+  }
+
+  const postedRow = row.row;
+
+  if (postedRow.type === "transfer") {
+    return `${postedRow.fromAccountName} → ${postedRow.toAccountName}`;
+  }
+
+  return postedRow.accountName;
+}
+
+function getActivityAmountClass(row: ActivityLedgerRow) {
+  if (row.kind === "expected") {
+    if (row.occurrence.kind === "transfer") {
+      return "text-info font-semibold";
+    }
+
+    return row.occurrence.amountCents >= 0
+      ? "text-positive font-semibold"
+      : "text-negative font-semibold";
+  }
+
+  const postedRow = row.row;
+
+  if (postedRow.type === "transfer") {
     return "text-info font-semibold";
   }
 
-  return row.amountCents >= 0
+  return postedRow.amountCents >= 0
     ? "text-positive font-semibold"
     : "text-negative font-semibold";
 }
 
-function getTransactionTypeBadgeClass(row: TransactionListRow) {
+function getPostedTransactionTypeBadgeClass(row: TransactionListRow) {
   if (row.type === "transfer") {
     return "badge badge--transfer";
   }
@@ -82,7 +249,7 @@ function getTransactionTypeBadgeClass(row: TransactionListRow) {
   return row.amountCents >= 0 ? "badge badge--income" : "badge badge--expense";
 }
 
-function getTransactionTypeBadgeLabel(row: TransactionListRow) {
+function getPostedTransactionTypeBadgeLabel(row: TransactionListRow) {
   if (row.type === "transfer") {
     return "transfer";
   }
@@ -112,6 +279,7 @@ export function TransactionsPage() {
   const transactions = useAppStore((state) => state.transactions);
   const categories = useAppStore((state) => state.categories);
   const accounts = useAppStore((state) => state.accounts);
+  const recurringRules = useAppStore((state) => state.recurringRules);
   const addTransaction = useAppStore((state) => state.addTransaction);
   const updateTransaction = useAppStore((state) => state.updateTransaction);
   const deleteTransaction = useAppStore((state) => state.deleteTransaction);
@@ -119,9 +287,21 @@ export function TransactionsPage() {
   const updateTransfer = useAppStore((state) => state.updateTransfer);
   const deleteTransfer = useAppStore((state) => state.deleteTransfer);
 
-  const categoryMap = useMemo(
-    () => new Map(categories.map((category) => [category.id, category.name])),
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const categoryMap = useMemo<CategoryLookup>(
+    () =>
+      new Map(
+        categories.map((category) => [
+          category.id,
+          { name: category.name, archived: Boolean(category.archivedAt) },
+        ])
+      ),
     [categories]
+  );
+  const accountMap = useMemo(
+    () => new Map(accounts.map((account) => [account.id, account.name])),
+    [accounts]
   );
 
   const transactionRows = useMemo(
@@ -132,6 +312,48 @@ export function TransactionsPage() {
   const filteredTransactions = useMemo(
     () => filterTransactionRows(transactionRows, filters),
     [filters, transactionRows]
+  );
+
+  const expectedOccurrences = useMemo(
+    () =>
+      deriveExpectedOccurrences(
+        recurringRules,
+        transactions,
+        {
+          startDate: `${filters.month}-01`,
+          endDate: format(endOfMonth(parseISO(`${filters.month}-01`)), "yyyy-MM-dd"),
+        },
+        today
+      ).filter((occurrence) => occurrence.status !== "matched"),
+    [filters.month, recurringRules, today, transactions]
+  );
+
+  const filteredExpectedOccurrences = useMemo(
+    () =>
+      filterExpectedOccurrences(
+        expectedOccurrences,
+        filters,
+        accountMap,
+        categoryMap
+      ),
+    [accountMap, categoryMap, expectedOccurrences, filters]
+  );
+
+  const activityRows = useMemo<ActivityLedgerRow[]>(
+    () =>
+      [
+        ...filteredTransactions.map((row) => ({
+          kind: "posted" as const,
+          id: row.id,
+          row,
+        })),
+        ...filteredExpectedOccurrences.map((occurrence) => ({
+          kind: "expected" as const,
+          id: occurrence.id,
+          occurrence,
+        })),
+      ].sort(sortActivityLedgerRows),
+    [filteredExpectedOccurrences, filteredTransactions]
   );
 
   const hasActiveFilters = useMemo(
@@ -245,39 +467,67 @@ export function TransactionsPage() {
   }
 
   const emptyStateMessage = hasActiveFilters
-    ? "no transactions match the current filters for this month. try clearing filters."
-    : "no transactions for this month yet. suspiciously peaceful.";
+    ? "no posted or expected rows match the current filters for this month. try clearing filters."
+    : "no posted or expected rows for this month yet. suspiciously peaceful.";
 
-  function renderTransactionBadges(row: TransactionListRow) {
+  function renderActivityBadges(row: ActivityLedgerRow) {
+    if (row.kind === "expected") {
+      return (
+        <div className="badge-row">
+          <span className={getExpectedStatusBadgeClass(row.occurrence.status)}>
+            {row.occurrence.status}
+          </span>
+          <span className="badge badge--muted">expected</span>
+          <span
+            className={
+              row.occurrence.kind === "transfer"
+                ? "badge badge--transfer"
+                : row.occurrence.amountCents >= 0
+                  ? "badge badge--income"
+                  : "badge badge--expense"
+            }
+          >
+            {row.occurrence.kind === "transfer"
+              ? "transfer"
+              : row.occurrence.amountCents >= 0
+                ? "income"
+                : "expense"}
+          </span>
+        </div>
+      );
+    }
+
+    const postedRow = row.row;
+
     return (
       <div className="badge-row">
-        <span className={getTransactionTypeBadgeClass(row)}>
-          {getTransactionTypeBadgeLabel(row)}
+        <span className={getPostedTransactionTypeBadgeClass(postedRow)}>
+          {getPostedTransactionTypeBadgeLabel(postedRow)}
         </span>
-        {row.type === "standard" && row.splits?.length ? (
+        {postedRow.type === "standard" && postedRow.splits?.length ? (
           <span className="badge badge--neutral">split</span>
         ) : null}
         <span
           className={
-            row.source === "recurring"
+            postedRow.source === "recurring"
               ? "badge badge--recurring"
               : "badge badge--neutral"
           }
         >
-          {row.source}
+          {postedRow.source}
         </span>
       </div>
     );
   }
 
-  function renderSplitBreakdown(row: TransactionListRow) {
-    if (row.type !== "standard" || !row.splits?.length) {
+  function renderSplitBreakdown(row: ActivityLedgerRow) {
+    if (row.kind === "expected" || row.row.type !== "standard" || !row.row.splits?.length) {
       return null;
     }
 
     return (
       <div className="stack-sm">
-        {row.splits.map((split) => (
+        {row.row.splits.map((split) => (
           <div
             key={split.id}
             style={{
@@ -289,7 +539,7 @@ export function TransactionsPage() {
           >
             <div className="stack-sm" style={{ minWidth: 0, gap: "0.15rem" }}>
               <span>
-                {categoryMap.get(split.categoryId) ?? "unknown"}
+                {categoryMap.get(split.categoryId)?.name ?? "unknown"}
               </span>
               {split.note ? (
                 <span className="muted-text">{split.note}</span>
@@ -304,17 +554,33 @@ export function TransactionsPage() {
     );
   }
 
-  function renderTransactionActions(row: TransactionListRow) {
-    if (row.type === "opening-balance") {
+  function renderActivityActions(row: ActivityLedgerRow) {
+    if (row.kind === "expected") {
+      return row.occurrence.recurringRuleId ? (
+        <div className="table-actions transaction-card__actions">
+          <button
+            type="button"
+            onClick={() => jumpToRecurringRule(row.occurrence.recurringRuleId)}
+            className="button button--secondary button--compact"
+          >
+            edit rule
+          </button>
+        </div>
+      ) : null;
+    }
+
+    const postedRow = row.row;
+
+    if (postedRow.type === "opening-balance") {
       return <span className="badge badge--muted">edit in accounts</span>;
     }
 
     return (
       <div className="table-actions transaction-card__actions">
-        {row.source === "recurring" && row.recurringRuleId ? (
+        {postedRow.source === "recurring" && postedRow.recurringRuleId ? (
           <button
             type="button"
-            onClick={() => jumpToRecurringRule(row.recurringRuleId!)}
+            onClick={() => jumpToRecurringRule(postedRow.recurringRuleId!)}
             className="button button--secondary button--compact"
           >
             edit rule
@@ -323,7 +589,7 @@ export function TransactionsPage() {
 
         <button
           type="button"
-          onClick={() => startEditingTransaction(row.id)}
+          onClick={() => startEditingTransaction(postedRow.id)}
           className="button button--secondary button--compact"
         >
           edit
@@ -331,7 +597,7 @@ export function TransactionsPage() {
 
         <button
           type="button"
-          onClick={() => handleDelete(row)}
+          onClick={() => handleDelete(postedRow)}
           className="button button--danger button--compact"
         >
           delete
@@ -473,8 +739,8 @@ export function TransactionsPage() {
               <div className="section-title-group">
                 <h2 className="section-title">ledger</h2>
                 <p className="section-subtitle">
-                  {filteredTransactions.length} transaction
-                  {filteredTransactions.length === 1 ? "" : "s"} in {filters.month}
+                  {activityRows.length} ledger row
+                  {activityRows.length === 1 ? "" : "s"} in {filters.month}
                   {hasActiveFilters ? " matching current filters" : ""}
                 </p>
               </div>
@@ -573,22 +839,34 @@ export function TransactionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.date}</td>
-                      <td>{getTransactionDetails(row)}</td>
-                      <td>{getTransactionCategoryLabel(row, categoryMap)}</td>
-                      <td>{row.type === "transfer" ? "—" : row.accountName}</td>
-                      <td>{renderTransactionBadges(row)}</td>
-                      <td className={`money-column ${getTransactionAmountClass(row)}`}>
-                        {formatCents(row.amountCents)}
+                  {activityRows.map((row) => (
+                    <tr key={row.id} className={row.kind === "expected" ? "activity-row--expected" : undefined}>
+                      <td>{row.kind === "expected" ? row.occurrence.date : row.row.date}</td>
+                      <td>{getActivityDetails(row)}</td>
+                      <td>{getActivityCategoryLabel(row, categoryMap)}</td>
+                      <td>
+                        {row.kind === "expected"
+                          ? row.occurrence.kind === "transfer"
+                            ? "—"
+                            : accountMap.get(row.occurrence.accountId) ?? "unknown"
+                          : row.row.type === "transfer"
+                            ? "—"
+                            : row.row.accountName}
                       </td>
-                      <td>{row.note ?? "—"}</td>
-                      <td>{renderTransactionActions(row)}</td>
+                      <td>{renderActivityBadges(row)}</td>
+                      <td className={`money-column ${getActivityAmountClass(row)}`}>
+                        {formatCents(
+                          row.kind === "expected"
+                            ? row.occurrence.amountCents
+                            : row.row.amountCents
+                        )}
+                      </td>
+                      <td>{row.kind === "expected" ? row.occurrence.note ?? "pending recurring" : row.row.note ?? "—"}</td>
+                      <td>{renderActivityActions(row)}</td>
                     </tr>
                   ))}
 
-                  {filteredTransactions.length === 0 ? (
+                  {activityRows.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="table-cell--flush">
                         <p className="empty-state">{emptyStateMessage}</p>
@@ -600,10 +878,10 @@ export function TransactionsPage() {
             </div>
 
             <div className="transaction-ledger-mobile" aria-label="transaction activity list">
-              {filteredTransactions.length === 0 ? (
+              {activityRows.length === 0 ? (
                 <p className="empty-state">{emptyStateMessage}</p>
               ) : (
-                filteredTransactions.map((row) => (
+                activityRows.map((row) => (
                   (() => {
                     const isExpanded = expandedTransactionId === row.id;
 
@@ -611,11 +889,15 @@ export function TransactionsPage() {
                   <article
                     key={row.id}
                     className={
-                      row.type === "transfer"
+                      row.kind === "expected"
+                        ? isExpanded
+                          ? "transaction-card transaction-card--expected transaction-card--expanded"
+                          : "transaction-card transaction-card--expected"
+                        : row.row.type === "transfer"
                         ? isExpanded
                           ? "transaction-card transaction-card--transfer transaction-card--expanded"
                           : "transaction-card transaction-card--transfer"
-                        : row.type === "opening-balance"
+                        : row.row.type === "opening-balance"
                           ? isExpanded
                             ? "transaction-card transaction-card--opening transaction-card--expanded"
                             : "transaction-card transaction-card--opening"
@@ -633,22 +915,28 @@ export function TransactionsPage() {
                       <div className="transaction-card__top">
                         <div className="transaction-card__details-group">
                           <div className="transaction-card__details">
-                            {getTransactionDetails(row)}
+                            {getActivityDetails(row)}
                           </div>
                         </div>
 
-                        <div className={`transaction-card__amount ${getTransactionAmountClass(row)}`}>
-                          {formatCents(row.amountCents)}
+                        <div className={`transaction-card__amount ${getActivityAmountClass(row)}`}>
+                          {formatCents(
+                            row.kind === "expected"
+                              ? row.occurrence.amountCents
+                              : row.row.amountCents
+                          )}
                         </div>
                       </div>
 
                       <div className="transaction-card__summary-footer">
                         <div className="transaction-card__summary-meta">
-                          <span className="transaction-card__date">{row.date}</span>
+                          <span className="transaction-card__date">
+                            {row.kind === "expected" ? row.occurrence.date : row.row.date}
+                          </span>
                           <span className="transaction-card__separator" aria-hidden="true">
                             ·
                           </span>
-                          <span>{getTransactionAccountLabel(row)}</span>
+                          <span>{getActivityAccountLabel(row, accountMap)}</span>
                         </div>
 
                         <span className="transaction-card__chevron" aria-hidden="true">
@@ -659,29 +947,37 @@ export function TransactionsPage() {
 
                     {isExpanded ? (
                       <div className="transaction-card__expanded-details">
-                        {row.type === "opening-balance" ? (
+                        {row.kind === "posted" && row.row.type === "opening-balance" ? (
                           <span className="transaction-card__eyebrow">account seed</span>
                         ) : null}
 
+                        {row.kind === "expected" ? (
+                          <span className="transaction-card__eyebrow">pending expected occurrence</span>
+                        ) : null}
+
                         <div className="transaction-card__meta-line">
-                          <span>{getTransactionCategoryLabel(row, categoryMap)}</span>
+                          <span>{getActivityCategoryLabel(row, categoryMap)}</span>
                           <span className="transaction-card__separator" aria-hidden="true">
                             ·
                           </span>
-                          <span>{getTransactionAccountLabel(row)}</span>
+                          <span>{getActivityAccountLabel(row, accountMap)}</span>
                         </div>
 
                         {renderSplitBreakdown(row)}
 
                         <div className="transaction-card__footer">
                           <div className="transaction-card__date-and-badges">
-                            {renderTransactionBadges(row)}
+                            {renderActivityBadges(row)}
                           </div>
 
-                          {renderTransactionActions(row)}
+                          {renderActivityActions(row)}
                         </div>
 
-                        {row.note ? <p className="transaction-card__note">{row.note}</p> : null}
+                        {(row.kind === "expected" ? row.occurrence.note : row.row.note) ? (
+                          <p className="transaction-card__note">
+                            {row.kind === "expected" ? row.occurrence.note : row.row.note}
+                          </p>
+                        ) : null}
                       </div>
                     ) : null}
                   </article>
