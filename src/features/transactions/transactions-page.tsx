@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { addDays, endOfMonth, format, parseISO, subDays } from "date-fns";
 
 import { useAppStore } from "../../app/store";
-import { getCurrentMonth } from "../../lib/dates";
+import { getCurrentDate, getCurrentMonth } from "../../lib/dates";
+import {
+  buildPendingExpectedOccurrences,
+  deriveExpectedOccurrences,
+} from "../../lib/expected-occurrences";
 import { formatCents } from "../../lib/money";
 import type { TransactionFormSubmission } from "../types";
 import { RecurringManagementSection } from "../recurring/recurring-management-section";
 import { TransactionForm } from "./transaction-form";
 import {
+  buildExpectedTransactionListRows,
   buildTransactionListRows,
   filterTransactionRows,
   hasActiveTransactionFilters,
@@ -15,13 +21,32 @@ import {
   type TransactionFilters,
 } from "./transaction-filters";
 
-type TransactionsTab = "activity" | "recurring";
+type TransactionsTab = "activity" | "inbox" | "recurring";
 
 function getTransactionsTab(value: string | null): TransactionsTab {
+  if (value === "inbox") {
+    return "inbox";
+  }
+
   return value === "recurring" ? "recurring" : "activity";
 }
 
+function getDelayUntilNextDay() {
+  const now = new Date();
+  const nextMidnight = new Date(now);
+
+  nextMidnight.setHours(24, 0, 1, 0);
+
+  return Math.max(1000, nextMidnight.getTime() - now.getTime());
+}
+
 function getTransactionDetails(row: TransactionListRow) {
+  if (row.type === "expected") {
+    return row.expectedKind === "transfer"
+      ? row.ruleName
+      : row.merchant ?? row.ruleName;
+  }
+
   if (row.type === "transfer") {
     return `${row.fromAccountName} → ${row.toAccountName}`;
   }
@@ -37,6 +62,14 @@ function getTransactionCategoryLabel(
   row: TransactionListRow,
   categoryMap: Map<string, string>
 ) {
+  if (row.type === "expected") {
+    if (row.expectedKind === "transfer") {
+      return "transfer";
+    }
+
+    return row.categoryName ?? "unknown";
+  }
+
   if (row.type === "transfer") {
     return "transfer";
   }
@@ -53,6 +86,10 @@ function getTransactionCategoryLabel(
 }
 
 function getTransactionAccountLabel(row: TransactionListRow) {
+  if (row.type === "expected" && row.expectedKind === "transfer") {
+    return `${row.accountName} → ${row.toAccountName ?? "unknown"}`;
+  }
+
   if (row.type === "transfer") {
     return `${row.fromAccountName} → ${row.toAccountName}`;
   }
@@ -61,6 +98,10 @@ function getTransactionAccountLabel(row: TransactionListRow) {
 }
 
 function getTransactionAmountClass(row: TransactionListRow) {
+  if (row.type === "expected" && row.expectedKind === "transfer") {
+    return "text-info font-semibold";
+  }
+
   if (row.type === "transfer") {
     return "text-info font-semibold";
   }
@@ -71,6 +112,14 @@ function getTransactionAmountClass(row: TransactionListRow) {
 }
 
 function getTransactionTypeBadgeClass(row: TransactionListRow) {
+  if (row.type === "expected") {
+    if (row.expectedKind === "transfer") {
+      return "badge badge--transfer";
+    }
+
+    return row.amountCents >= 0 ? "badge badge--income" : "badge badge--expense";
+  }
+
   if (row.type === "transfer") {
     return "badge badge--transfer";
   }
@@ -83,6 +132,14 @@ function getTransactionTypeBadgeClass(row: TransactionListRow) {
 }
 
 function getTransactionTypeBadgeLabel(row: TransactionListRow) {
+  if (row.type === "expected") {
+    if (row.expectedKind === "transfer") {
+      return "transfer";
+    }
+
+    return row.amountCents >= 0 ? "income" : "expense";
+  }
+
   if (row.type === "transfer") {
     return "transfer";
   }
@@ -105,6 +162,7 @@ export function TransactionsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null);
+  const [today, setToday] = useState(() => getCurrentDate());
   const editSectionRef = useRef<HTMLDivElement | null>(null);
 
   const activeTab = getTransactionsTab(searchParams.get("tab"));
@@ -112,12 +170,14 @@ export function TransactionsPage() {
   const transactions = useAppStore((state) => state.transactions);
   const categories = useAppStore((state) => state.categories);
   const accounts = useAppStore((state) => state.accounts);
+  const recurringRules = useAppStore((state) => state.recurringRules);
   const addTransaction = useAppStore((state) => state.addTransaction);
   const updateTransaction = useAppStore((state) => state.updateTransaction);
   const deleteTransaction = useAppStore((state) => state.deleteTransaction);
   const addTransfer = useAppStore((state) => state.addTransfer);
   const updateTransfer = useAppStore((state) => state.updateTransfer);
   const deleteTransfer = useAppStore((state) => state.deleteTransfer);
+  const postExpectedOccurrence = useAppStore((state) => state.postExpectedOccurrence);
 
   const categoryMap = useMemo(
     () => new Map(categories.map((category) => [category.id, category.name])),
@@ -129,9 +189,93 @@ export function TransactionsPage() {
     [accounts, transactions]
   );
 
+  const expectedOccurrences = useMemo(() => {
+    const monthStart = `${filters.month}-01`;
+    const monthEnd = format(endOfMonth(parseISO(monthStart)), "yyyy-MM-dd");
+
+    return buildPendingExpectedOccurrences(
+      deriveExpectedOccurrences(
+        recurringRules,
+        transactions,
+        {
+          startDate: monthStart,
+          endDate: monthEnd,
+        },
+        {
+          today,
+          categories,
+        }
+      )
+    );
+  }, [categories, filters.month, recurringRules, today, transactions]);
+
+  const expectedRows = useMemo(
+    () => buildExpectedTransactionListRows(expectedOccurrences, accounts),
+    [accounts, expectedOccurrences]
+  );
+
+  const inboxWindowStart = useMemo(
+    () => format(subDays(new Date(`${today}T12:00:00`), 30), "yyyy-MM-dd"),
+    [today]
+  );
+  const inboxWindowEnd = useMemo(
+    () => format(addDays(new Date(`${today}T12:00:00`), 30), "yyyy-MM-dd"),
+    [today]
+  );
+
+  const inboxOccurrences = useMemo(
+    () =>
+      buildPendingExpectedOccurrences(
+        deriveExpectedOccurrences(
+          recurringRules,
+          transactions,
+          {
+            startDate: inboxWindowStart,
+            endDate: inboxWindowEnd,
+          },
+          {
+            today,
+            categories,
+          }
+        )
+      ),
+    [categories, inboxWindowEnd, inboxWindowStart, recurringRules, today, transactions]
+  );
+
+  const inboxRows = useMemo(
+    () => buildExpectedTransactionListRows(inboxOccurrences, accounts),
+    [accounts, inboxOccurrences]
+  );
+
+  const inboxOccurrenceMap = useMemo(
+    () => new Map(inboxOccurrences.map((occurrence) => [occurrence.id, occurrence])),
+    [inboxOccurrences]
+  );
+
   const filteredTransactions = useMemo(
-    () => filterTransactionRows(transactionRows, filters),
-    [filters, transactionRows]
+    () =>
+      filterTransactionRows([...transactionRows, ...expectedRows], filters).sort(
+        (left, right) => {
+          if (left.date !== right.date) {
+            return right.date.localeCompare(left.date);
+          }
+
+          if (left.type === right.type) {
+            return left.id.localeCompare(right.id);
+          }
+
+          if (left.type === "expected") {
+            return 1;
+          }
+
+          if (right.type === "expected") {
+            return -1;
+          }
+
+          return left.id.localeCompare(right.id);
+        }
+      ),
+    [expectedRows, filters, transactionRows]
   );
 
   const hasActiveFilters = useMemo(
@@ -158,6 +302,14 @@ export function TransactionsPage() {
       behavior: "smooth",
     });
   }, [editingTransaction]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setToday(getCurrentDate());
+    }, getDelayUntilNextDay());
+
+    return () => window.clearTimeout(timeoutId);
+  }, [today]);
 
   function updateSearchParams(nextTab: TransactionsTab) {
     const nextParams = new URLSearchParams(searchParams);
@@ -209,7 +361,7 @@ export function TransactionsPage() {
   }
 
   function handleDelete(row: TransactionListRow) {
-    if (row.type === "opening-balance") {
+    if (row.type === "opening-balance" || row.type === "expected") {
       return;
     }
 
@@ -244,11 +396,44 @@ export function TransactionsPage() {
     setExpandedTransactionId(null);
   }
 
+  function handlePostExpected(rowId: string) {
+    const occurrence = inboxOccurrenceMap.get(rowId);
+
+    if (!occurrence) {
+      return;
+    }
+
+    postExpectedOccurrence(occurrence);
+    setExpandedTransactionId(null);
+  }
+
   const emptyStateMessage = hasActiveFilters
-    ? "no transactions match the current filters for this month. try clearing filters."
-    : "no transactions for this month yet. suspiciously peaceful.";
+    ? "no ledger rows match the current filters for this month. try clearing filters."
+    : "no posted or expected activity for this month yet. suspiciously peaceful.";
 
   function renderTransactionBadges(row: TransactionListRow) {
+    if (row.type === "expected") {
+      return (
+        <div className="badge-row">
+          <span className={getTransactionTypeBadgeClass(row)}>
+            {getTransactionTypeBadgeLabel(row)}
+          </span>
+          <span className="badge badge--expected">expected</span>
+          <span
+            className={
+              row.status === "overdue"
+                ? "badge badge--expense"
+                : row.status === "due"
+                  ? "badge badge--opening"
+                  : "badge badge--neutral"
+            }
+          >
+            {row.status}
+          </span>
+        </div>
+      );
+    }
+
     return (
       <div className="badge-row">
         <span className={getTransactionTypeBadgeClass(row)}>
@@ -305,6 +490,30 @@ export function TransactionsPage() {
   }
 
   function renderTransactionActions(row: TransactionListRow) {
+    if (row.type === "expected") {
+      return (
+        <div className="table-actions transaction-card__actions">
+          {activeTab === "inbox" ? (
+            <button
+              type="button"
+              onClick={() => handlePostExpected(row.id)}
+              className="button button--primary button--compact"
+              aria-label={`post ${row.ruleName} for ${row.date}`}
+            >
+              post now
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => jumpToRecurringRule(row.recurringRuleId)}
+            className="button button--secondary button--compact"
+          >
+            edit rule
+          </button>
+        </div>
+      );
+    }
+
     if (row.type === "opening-balance") {
       return <span className="badge badge--muted">edit in accounts</span>;
     }
@@ -364,6 +573,19 @@ export function TransactionsPage() {
           onClick={() => updateSearchParams("activity")}
         >
           activity
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "inbox"}
+          className={
+            activeTab === "inbox"
+              ? "subview-switcher__button subview-switcher__button--active"
+              : "subview-switcher__button"
+          }
+          onClick={() => updateSearchParams("inbox")}
+        >
+          inbox
         </button>
         <button
           type="button"
@@ -473,7 +695,7 @@ export function TransactionsPage() {
               <div className="section-title-group">
                 <h2 className="section-title">ledger</h2>
                 <p className="section-subtitle">
-                  {filteredTransactions.length} transaction
+                  {filteredTransactions.length} ledger row
                   {filteredTransactions.length === 1 ? "" : "s"} in {filters.month}
                   {hasActiveFilters ? " matching current filters" : ""}
                 </p>
@@ -574,16 +796,21 @@ export function TransactionsPage() {
                 </thead>
                 <tbody>
                   {filteredTransactions.map((row) => (
-                    <tr key={row.id}>
+                    <tr key={row.id} className={row.type === "expected" ? "table-row--expected" : undefined}>
                       <td>{row.date}</td>
                       <td>{getTransactionDetails(row)}</td>
                       <td>{getTransactionCategoryLabel(row, categoryMap)}</td>
-                      <td>{row.type === "transfer" ? "—" : row.accountName}</td>
+                      <td>
+                        {row.type === "transfer" ||
+                        (row.type === "expected" && row.expectedKind === "transfer")
+                          ? "—"
+                          : row.accountName}
+                      </td>
                       <td>{renderTransactionBadges(row)}</td>
                       <td className={`money-column ${getTransactionAmountClass(row)}`}>
                         {formatCents(row.amountCents)}
                       </td>
-                      <td>{row.note ?? "—"}</td>
+                      <td>{row.note ?? (row.type === "expected" ? "pending occurrence" : "—")}</td>
                       <td>{renderTransactionActions(row)}</td>
                     </tr>
                   ))}
@@ -611,7 +838,11 @@ export function TransactionsPage() {
                   <article
                     key={row.id}
                     className={
-                      row.type === "transfer"
+                      row.type === "expected"
+                        ? isExpanded
+                          ? "transaction-card transaction-card--expected transaction-card--expanded"
+                          : "transaction-card transaction-card--expected"
+                        : row.type === "transfer"
                         ? isExpanded
                           ? "transaction-card transaction-card--transfer transaction-card--expanded"
                           : "transaction-card transaction-card--transfer"
@@ -645,10 +876,16 @@ export function TransactionsPage() {
                       <div className="transaction-card__summary-footer">
                         <div className="transaction-card__summary-meta">
                           <span className="transaction-card__date">{row.date}</span>
-                          <span className="transaction-card__separator" aria-hidden="true">
-                            ·
-                          </span>
-                          <span>{getTransactionAccountLabel(row)}</span>
+                          {row.type === "expected" ? (
+                            <span className="badge badge--expected">pending</span>
+                          ) : (
+                            <>
+                              <span className="transaction-card__separator" aria-hidden="true">
+                                ·
+                              </span>
+                              <span>{getTransactionAccountLabel(row)}</span>
+                            </>
+                          )}
                         </div>
 
                         <span className="transaction-card__chevron" aria-hidden="true">
@@ -671,6 +908,13 @@ export function TransactionsPage() {
                           <span>{getTransactionAccountLabel(row)}</span>
                         </div>
 
+                        {row.type === "expected" ? (
+                          <div className="transaction-card__meta-line">
+                            <span className="transaction-card__eyebrow">rule</span>
+                            <span>{row.ruleName}</span>
+                          </div>
+                        ) : null}
+
                         {renderSplitBreakdown(row)}
 
                         <div className="transaction-card__footer">
@@ -692,6 +936,149 @@ export function TransactionsPage() {
             </div>
           </div>
         </>
+      ) : activeTab === "inbox" ? (
+        <div className="section-card section-card--surface">
+          <div className="section-header">
+            <div className="section-title-group">
+              <h2 className="section-title">expected inbox</h2>
+              <p className="section-subtitle">
+                pending derived occurrences from the last 30 days through the next 30 days. posting turns them into real ledger transactions.
+              </p>
+            </div>
+          </div>
+
+          <div className="toolbar toolbar--spaced">
+            <p className="section-subtitle">
+              {inboxRows.length} pending item{inboxRows.length === 1 ? "" : "s"} in the current review window.
+            </p>
+          </div>
+
+          <div className="table-wrap transaction-ledger-table">
+            <table className="app-table">
+              <thead>
+                <tr>
+                  <th>date</th>
+                  <th>details</th>
+                  <th>category</th>
+                  <th>account</th>
+                  <th>badges</th>
+                  <th className="money-column">amount</th>
+                  <th>note</th>
+                  <th>actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inboxRows.map((row) => (
+                  <tr key={row.id} className="table-row--expected">
+                    <td>{row.date}</td>
+                    <td>{getTransactionDetails(row)}</td>
+                    <td>{getTransactionCategoryLabel(row, categoryMap)}</td>
+                    <td>{getTransactionAccountLabel(row)}</td>
+                    <td>{renderTransactionBadges(row)}</td>
+                    <td className={`money-column ${getTransactionAmountClass(row)}`}>
+                      {formatCents(row.amountCents)}
+                    </td>
+                    <td>{row.note ?? "pending occurrence"}</td>
+                    <td>{renderTransactionActions(row)}</td>
+                  </tr>
+                ))}
+
+                {inboxRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="table-cell--flush">
+                      <p className="empty-state">no pending expected items in the current last-30 / next-30-day window.</p>
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="transaction-ledger-mobile" aria-label="expected inbox list">
+            {inboxRows.length === 0 ? (
+              <p className="empty-state">no pending expected items in the current last-30 / next-30-day window.</p>
+            ) : (
+              inboxRows.map((row) => {
+                if (row.type !== "expected") {
+                  return null;
+                }
+
+                const isExpanded = expandedTransactionId === row.id;
+
+                return (
+                  <article
+                    key={row.id}
+                    className={
+                      isExpanded
+                        ? "transaction-card transaction-card--expected transaction-card--expanded"
+                        : "transaction-card transaction-card--expected"
+                    }
+                  >
+                    <button
+                      type="button"
+                      className="transaction-card__summary"
+                      aria-expanded={isExpanded}
+                      onClick={() => toggleExpandedTransaction(row.id)}
+                    >
+                      <div className="transaction-card__top">
+                        <div className="transaction-card__details-group">
+                          <div className="transaction-card__details">
+                            {getTransactionDetails(row)}
+                          </div>
+                        </div>
+
+                        <div className={`transaction-card__amount ${getTransactionAmountClass(row)}`}>
+                          {formatCents(row.amountCents)}
+                        </div>
+                      </div>
+
+                      <div className="transaction-card__summary-footer">
+                        <div className="transaction-card__summary-meta">
+                          <span className="transaction-card__date">{row.date}</span>
+                          <span className="transaction-card__separator" aria-hidden="true">
+                            ·
+                          </span>
+                          <span>{row.status}</span>
+                        </div>
+
+                        <span className="transaction-card__chevron" aria-hidden="true">
+                          {isExpanded ? "▴" : "▾"}
+                        </span>
+                      </div>
+                    </button>
+
+                    {isExpanded ? (
+                      <div className="transaction-card__expanded-details">
+                        <div className="transaction-card__meta-line">
+                          <span>{getTransactionCategoryLabel(row, categoryMap)}</span>
+                          <span className="transaction-card__separator" aria-hidden="true">
+                            ·
+                          </span>
+                          <span>{getTransactionAccountLabel(row)}</span>
+                        </div>
+
+                        <div className="transaction-card__meta-line">
+                          <span className="transaction-card__eyebrow">rule</span>
+                          <span>{row.ruleName}</span>
+                        </div>
+
+                        <div className="transaction-card__footer">
+                          <div className="transaction-card__date-and-badges">
+                            {renderTransactionBadges(row)}
+                          </div>
+
+                          {renderTransactionActions(row)}
+                        </div>
+
+                        {row.note ? <p className="transaction-card__note">{row.note}</p> : null}
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })
+            )}
+          </div>
+        </div>
       ) : (
         <RecurringManagementSection focusedRuleId={searchParams.get("rule")} />
       )}

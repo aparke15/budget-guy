@@ -1,4 +1,8 @@
 import { getMonthKey } from "../../lib/dates";
+import type {
+  ExpectedOccurrence,
+  ExpectedOccurrenceStatus,
+} from "../../lib/expected-occurrences";
 import { getTransactionCategoryIds, hasTransactionSplits } from "../../lib/transaction-splits";
 import type { Account, Transaction } from "../../types";
 
@@ -51,6 +55,26 @@ export type TransactionListRow =
       recurringRuleId?: string;
       transferGroupId: string;
       transactions: [Transaction, Transaction];
+    }
+  | {
+      type: "expected";
+      id: string;
+      date: string;
+      amountCents: number;
+      expectedKind: ExpectedOccurrence["kind"];
+      status: ExpectedOccurrenceStatus;
+      accountId: string;
+      accountName: string;
+      toAccountId?: string;
+      toAccountName?: string;
+      categoryId?: string;
+      categoryIds: string[];
+      categoryName?: string;
+      categoryArchived: boolean;
+      merchant?: string;
+      note?: string;
+      recurringRuleId: string;
+      ruleName: string;
     };
 
 export function buildTransactionListRows(
@@ -143,6 +167,36 @@ export function buildTransactionListRows(
   });
 }
 
+export function buildExpectedTransactionListRows(
+  occurrences: ExpectedOccurrence[],
+  accounts: Account[]
+): TransactionListRow[] {
+  const accountMap = new Map(accounts.map((account) => [account.id, account.name]));
+
+  return occurrences.map<TransactionListRow>((occurrence) => ({
+    type: "expected",
+    id: occurrence.id,
+    date: occurrence.date,
+    amountCents: occurrence.amountCents,
+    expectedKind: occurrence.kind,
+    status: occurrence.status,
+    accountId: occurrence.accountId,
+    accountName: accountMap.get(occurrence.accountId) ?? "unknown",
+    toAccountId: occurrence.toAccountId,
+    toAccountName: occurrence.toAccountId
+      ? accountMap.get(occurrence.toAccountId) ?? "unknown"
+      : undefined,
+    categoryId: occurrence.categoryId,
+    categoryIds: occurrence.categoryId ? [occurrence.categoryId] : [],
+    categoryName: occurrence.categoryName,
+    categoryArchived: occurrence.categoryArchived,
+    merchant: occurrence.merchant,
+    note: occurrence.note,
+    recurringRuleId: occurrence.recurringRuleId,
+    ruleName: occurrence.ruleName,
+  }));
+}
+
 export function filterTransactionRows(
   rows: TransactionListRow[],
   filters: TransactionFilters
@@ -156,6 +210,14 @@ export function filterTransactionRows(
 
     if (filters.accountId) {
       if (row.type === "standard" && row.accountId !== filters.accountId) {
+        return false;
+      }
+
+      if (
+        row.type === "expected" &&
+        row.accountId !== filters.accountId &&
+        row.toAccountId !== filters.accountId
+      ) {
         return false;
       }
 
@@ -176,7 +238,7 @@ export function filterTransactionRows(
     }
 
     if (filters.categoryId) {
-      if (row.type !== "standard") {
+      if (row.type !== "standard" && row.type !== "expected") {
         return false;
       }
 
@@ -195,6 +257,24 @@ export function filterTransactionRows(
 
       return (
         merchant.includes(normalizedSearch) || note.includes(normalizedSearch)
+      );
+    }
+
+    if (row.type === "expected") {
+      const merchant = row.merchant?.toLowerCase() ?? "";
+      const note = row.note?.toLowerCase() ?? "";
+      const ruleName = row.ruleName.toLowerCase();
+      const accountName = row.accountName.toLowerCase();
+      const toAccountName = row.toAccountName?.toLowerCase() ?? "";
+      const categoryName = row.categoryName?.toLowerCase() ?? "";
+
+      return (
+        merchant.includes(normalizedSearch) ||
+        note.includes(normalizedSearch) ||
+        ruleName.includes(normalizedSearch) ||
+        accountName.includes(normalizedSearch) ||
+        toAccountName.includes(normalizedSearch) ||
+        categoryName.includes(normalizedSearch)
       );
     }
 

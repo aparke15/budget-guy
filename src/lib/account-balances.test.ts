@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   getAvailableCreditCents,
+  getAllAccountBalanceComparisons,
   getAccountBalanceCents,
   getAccountLedgerBalanceCents,
   getAccountMonthlyHistoryRows,
   getDisplayedAccountBalanceCents,
   getDisplayedAccountBalanceLabel,
+  getExpectedAccountBalanceCents,
   getAllAccountBalances,
 } from "./account-balances";
 import type { Account, Budget, Transaction } from "../types";
@@ -268,6 +270,70 @@ describe("account balance helpers", () => {
         -5000
       )
     ).toBeUndefined();
+  });
+
+  it("adds expected deltas to current balances without changing existing helpers", () => {
+    expect(getExpectedAccountBalanceCents(86000, -15000)).toBe(71000);
+    expect(
+      getAllAccountBalanceComparisons(accounts, transactions, [
+        {
+          accountId: "acct-checking",
+          pendingCount: 2,
+          netExpectedChangeCents: -15000,
+        },
+        {
+          accountId: "acct-credit",
+          pendingCount: 1,
+          netExpectedChangeCents: -4500,
+        },
+      ])
+    ).toEqual([
+      {
+        accountId: "acct-checking",
+        accountName: "Checking",
+        accountType: "checking",
+        balanceCents: 86000,
+        displayLabel: "balance",
+        displayValueCents: 86000,
+        creditLimitCents: undefined,
+        availableCreditCents: undefined,
+        pendingExpectedCount: 2,
+        pendingExpectedChangeCents: -15000,
+        expectedBalanceCents: 71000,
+        expectedDisplayValueCents: 71000,
+        expectedAvailableCreditCents: undefined,
+      },
+      {
+        accountId: "acct-savings",
+        accountName: "Savings",
+        accountType: "savings",
+        balanceCents: 35000,
+        displayLabel: "balance",
+        displayValueCents: 35000,
+        creditLimitCents: undefined,
+        availableCreditCents: undefined,
+        pendingExpectedCount: 0,
+        pendingExpectedChangeCents: 0,
+        expectedBalanceCents: 35000,
+        expectedDisplayValueCents: 35000,
+        expectedAvailableCreditCents: undefined,
+      },
+      {
+        accountId: "acct-credit",
+        accountName: "Visa",
+        accountType: "credit",
+        balanceCents: -20000,
+        displayLabel: "balance",
+        displayValueCents: -20000,
+        creditLimitCents: 200000,
+        availableCreditCents: 180000,
+        pendingExpectedCount: 1,
+        pendingExpectedChangeCents: -4500,
+        expectedBalanceCents: -24500,
+        expectedDisplayValueCents: -24500,
+        expectedAvailableCreditCents: 175500,
+      },
+    ]);
   });
 
   it("builds monthly history rows with inflows, outflows, net change, and closing balance", () => {

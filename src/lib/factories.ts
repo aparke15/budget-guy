@@ -5,6 +5,7 @@ import {
   formatCentsForInput,
   parseAmountInputToCents,
 } from "./money";
+import type { ExpectedOccurrence } from "./expected-occurrences";
 import type {
   TransferFormInput,
   TransactionFormInitialState,
@@ -289,6 +290,32 @@ export function createTransaction(
     recurringRuleId: existing?.recurringRuleId,
     transferGroupId: undefined,
     createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+}
+
+export function createTransactionFromExpectedOccurrence(
+  occurrence: ExpectedOccurrence
+): Transaction {
+  if (occurrence.kind !== "standard") {
+    throw new Error("transfer expected occurrences must use the transfer factory");
+  }
+
+  const now = getNowIso();
+
+  return {
+    id: makeId("txn"),
+    kind: "standard",
+    date: occurrence.date,
+    amountCents: occurrence.amountCents,
+    accountId: occurrence.accountId,
+    categoryId: occurrence.categoryId,
+    merchant: occurrence.merchant,
+    note: occurrence.note,
+    source: "recurring",
+    recurringRuleId: occurrence.recurringRuleId,
+    transferGroupId: undefined,
+    createdAt: now,
     updatedAt: now,
   };
 }

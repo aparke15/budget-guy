@@ -107,6 +107,17 @@ function hasEntityCard(text: string) {
   );
 }
 
+function getSectionByHeading(text: string) {
+  const heading = screen.getByRole("heading", { name: text });
+  const section = heading.closest<HTMLElement>(".section-card");
+
+  if (!section) {
+    throw new Error(`section not found for ${text}`);
+  }
+
+  return section;
+}
+
 describe("accounts page opening-balance and delete flows", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -229,11 +240,13 @@ describe("accounts page opening-balance and delete flows", () => {
       }),
     ]);
 
-    const balanceCell = screen.getAllByText("-$200.00")[0];
+    const currentBalancesSection = getSectionByHeading("current balances");
+    const currentBalancesTable = within(currentBalancesSection).getByRole("table");
+    const balanceCell = within(currentBalancesTable).getAllByText("$200.00")[0];
 
     expect(balanceCell.className).toContain("text-negative");
-    expect(screen.getByText("$1,000.00")).toBeTruthy();
-    expect(screen.getByText("$800.00")).toBeTruthy();
+    expect(within(currentBalancesTable).getByText("$1,000.00")).toBeTruthy();
+    expect(within(currentBalancesTable).getAllByText("$800.00").length).toBeGreaterThan(0);
   });
 
   it("deletes an account from the page by cascading related transactions, transfer pairs, opening balances, and recurring rules", async () => {
@@ -257,10 +270,11 @@ describe("accounts page opening-balance and delete flows", () => {
       categories: [
         {
           id: "cat-rent",
-          name: "rent",
+          name: "old rent",
           kind: "expense",
+          archivedAt: "2026-04-10T00:00:00.000Z",
           createdAt: "2026-04-01T00:00:00.000Z",
-          updatedAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
         },
       ],
       transactions: [
@@ -347,5 +361,74 @@ describe("accounts page opening-balance and delete flows", () => {
     ]);
     expect(useAppStore.getState().transactions).toEqual([]);
     expect(useAppStore.getState().recurringRules).toEqual([]);
+  });
+
+  it("shows expected 30-day balances and pending expected items without posting transactions", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-checking",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      categories: [
+        {
+          id: "cat-rent",
+          name: "old rent",
+          kind: "expense",
+          archivedAt: "2026-04-10T00:00:00.000Z",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "txn-balance",
+          kind: "opening-balance",
+          date: "2026-04-05",
+          amountCents: 10000,
+          accountId: "acct-checking",
+          source: "manual",
+          createdAt: "2026-04-05T00:00:00.000Z",
+          updatedAt: "2026-04-05T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-rent",
+          kind: "standard",
+          name: "rent",
+          amountCents: -4000,
+          accountId: "acct-checking",
+          categoryId: "cat-rent",
+          frequency: "monthly",
+          startDate: "2026-01-25",
+          active: true,
+          dayOfMonth: 25,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { AccountsPage, useAppStore } = await loadAccountsPage(persisted);
+
+    render(<AccountsPage />);
+
+    const currentBalancesSection = getSectionByHeading("current balances");
+    const currentBalancesTable = within(currentBalancesSection).getByRole("table");
+    const pendingSection = getSectionByHeading("checking pending expected items");
+
+    expect(within(currentBalancesTable).getByText("$100.00")).toBeTruthy();
+    expect(within(currentBalancesTable).getByText("$60.00")).toBeTruthy();
+    expect(within(currentBalancesSection).getByText("next 30d")).toBeTruthy();
+    expect(
+      within(pendingSection).getByText(
+        /2026-04-25 · rent · \$40.00 · old rent \(archived\) · upcoming/
+      )
+    ).toBeTruthy();
+    expect(useAppStore.getState().transactions).toHaveLength(1);
   });
 });

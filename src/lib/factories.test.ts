@@ -4,6 +4,7 @@ import {
   createAccount,
   createBudget,
   createOpeningBalanceTransaction,
+  createTransactionFromExpectedOccurrence,
   createTransferInput,
   createCategory,
   createRecurringRule,
@@ -172,6 +173,59 @@ describe("factory helpers", () => {
         transaction: existing,
       }).categoryId
     ).toBe("cat-old-food");
+  });
+
+  it("creates a recurring standard transaction from an expected occurrence", () => {
+    expect(
+      createTransactionFromExpectedOccurrence({
+        id: "rule-rent:2026-04-21",
+        recurringRuleId: "rule-rent",
+        ruleName: "rent",
+        kind: "standard",
+        date: "2026-04-21",
+        amountCents: -120000,
+        accountId: "acct-checking",
+        categoryId: "cat-food",
+        categoryName: "Food",
+        categoryArchived: false,
+        merchant: "Landlord",
+        note: "autopay",
+        status: "due",
+        matchedTransactionCount: 0,
+        daysFromToday: 0,
+      })
+    ).toMatchObject({
+      kind: "standard",
+      date: "2026-04-21",
+      amountCents: -120000,
+      accountId: "acct-checking",
+      categoryId: "cat-food",
+      merchant: "Landlord",
+      note: "autopay",
+      source: "recurring",
+      recurringRuleId: "rule-rent",
+      createdAt: "2026-04-21T12:34:56.000Z",
+      updatedAt: "2026-04-21T12:34:56.000Z",
+    });
+  });
+
+  it("rejects transfer expected occurrences for the standard transaction factory", () => {
+    expect(() =>
+      createTransactionFromExpectedOccurrence({
+        id: "rule-save:2026-04-21",
+        recurringRuleId: "rule-save",
+        ruleName: "save",
+        kind: "transfer",
+        date: "2026-04-21",
+        amountCents: 2500,
+        accountId: "acct-checking",
+        toAccountId: "acct-savings",
+        categoryArchived: false,
+        status: "due",
+        matchedTransactionCount: 0,
+        daysFromToday: 0,
+      })
+    ).toThrow("transfer expected occurrences must use the transfer factory");
   });
 
   it("maps an existing split transaction into editable form values", () => {

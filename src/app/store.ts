@@ -3,8 +3,10 @@ import { create } from "zustand";
 import { hasBudgetForMonthCategory } from "../features/budgets/budget-page-helpers";
 import { countTransactionsReferencingCategory } from "../lib/transaction-splits";
 import { getNowIso } from "../lib/dates";
+import type { ExpectedOccurrence } from "../lib/expected-occurrences";
 import {
   createOpeningBalanceTransaction,
+  createTransactionFromExpectedOccurrence,
   createTransferTransactions,
 } from "../lib/factories";
 import { latestPersistedStateSchema } from "../lib/validation";
@@ -52,6 +54,7 @@ type AppState = {
   addTransaction: (input: Transaction) => void;
   updateTransaction: (id: string, input: Partial<Transaction>) => void;
   deleteTransaction: (id: string) => void;
+  postExpectedOccurrence: (occurrence: ExpectedOccurrence) => void;
   addTransfer: (input: {
     date: string;
     fromAccountId: string;
@@ -348,6 +351,17 @@ function removeAccountOpeningBalanceTransactions(
   return transactions.filter(
     (transaction) =>
       !(transaction.accountId === accountId && transaction.kind === "opening-balance")
+  );
+}
+
+function hasStrictExpectedOccurrenceMatch(
+  transactions: Transaction[],
+  occurrence: Pick<ExpectedOccurrence, "recurringRuleId" | "date">
+) {
+  return transactions.some(
+    (transaction) =>
+      transaction.recurringRuleId === occurrence.recurringRuleId &&
+      transaction.date === occurrence.date
   );
 }
 
@@ -701,6 +715,52 @@ export const useAppStore = create<AppState>((set) => ({
           ),
         },
         "deleteTransaction"
+      );
+
+      return nextCollections ?? {};
+    }),
+
+  postExpectedOccurrence: (occurrence) =>
+    set((state) => {
+      if (hasStrictExpectedOccurrenceMatch(state.transactions, occurrence)) {
+        return {};
+      }
+
+      const nextTransactions =
+        occurrence.kind === "transfer"
+          ? occurrence.toAccountId
+            ? [
+                ...state.transactions,
+                ...createTransferTransactions({
+                  input: {
+                    date: occurrence.date,
+                    fromAccountId: occurrence.accountId,
+                    toAccountId: occurrence.toAccountId,
+                    amountCents: Math.abs(occurrence.amountCents),
+                    note: occurrence.note,
+                  },
+                  metadata: {
+                    source: "recurring",
+                    recurringRuleId: occurrence.recurringRuleId,
+                  },
+                }),
+              ]
+            : state.transactions
+          : [
+              ...state.transactions,
+              createTransactionFromExpectedOccurrence(occurrence),
+            ];
+
+      if (nextTransactions === state.transactions) {
+        return {};
+      }
+
+      const nextCollections = validateStoreCollectionsUpdate(
+        getStoreCollections(state),
+        {
+          transactions: sortTransactions(nextTransactions),
+        },
+        "postExpectedOccurrence"
       );
 
       return nextCollections ?? {};

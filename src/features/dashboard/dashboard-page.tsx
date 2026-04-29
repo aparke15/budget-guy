@@ -1,8 +1,14 @@
 import { useMemo, useState } from "react";
+import { addDays, format, subDays } from "date-fns";
 
 import { useAppStore } from "../../app/store";
 import { generateRecurringForRange } from "../../app/recurring-store-actions";
-import { getCurrentMonth } from "../../lib/dates";
+import { getCurrentDate, getCurrentMonth } from "../../lib/dates";
+import {
+  buildDueSoonList,
+  buildExpectedOccurrenceSummary,
+  deriveExpectedOccurrences,
+} from "../../lib/expected-occurrences";
 import { formatCents, getBudgetRows, getMonthlySummary } from "../../lib/money";
 import { hasTransactionSplits } from "../../lib/transaction-splits";
 import { RecurringGenerationFeedback } from "../recurring/recurring-generation-feedback";
@@ -36,13 +42,50 @@ export function DashboardPage() {
   const budgets = useAppStore((state) => state.budgets);
   const categories = useAppStore((state) => state.categories);
   const accounts = useAppStore((state) => state.accounts);
+  const recurringRules = useAppStore((state) => state.recurringRules);
   const generationSummary = useAppStore(
     (state) => state.lastRecurringGenerationSummary
+  );
+  const today = getCurrentDate();
+  const nearTermWindowStart = useMemo(
+    () => format(subDays(new Date(`${today}T12:00:00`), 30), "yyyy-MM-dd"),
+    [today]
+  );
+  const nearTermWindowEnd = useMemo(
+    () => format(addDays(new Date(`${today}T12:00:00`), 30), "yyyy-MM-dd"),
+    [today]
   );
 
   const summary = useMemo(
     () => getMonthlySummary(transactions, budgets, month),
     [budgets, month, transactions]
+  );
+
+  const expectedOccurrences = useMemo(
+    () =>
+      deriveExpectedOccurrences(
+        recurringRules,
+        transactions,
+        {
+          startDate: nearTermWindowStart,
+          endDate: nearTermWindowEnd,
+        },
+        {
+          today,
+          categories,
+        }
+      ),
+    [categories, nearTermWindowEnd, nearTermWindowStart, recurringRules, today, transactions]
+  );
+
+  const expectedSummary = useMemo(
+    () => buildExpectedOccurrenceSummary(expectedOccurrences),
+    [expectedOccurrences]
+  );
+
+  const dueSoonOccurrences = useMemo(
+    () => buildDueSoonList(expectedOccurrences, { limit: 5 }),
+    [expectedOccurrences]
   );
 
   const budgetRows = useMemo(
@@ -221,6 +264,12 @@ export function DashboardPage() {
         />
       </div>
 
+      <div className="summary-grid">
+        <Card title="due today" value={String(expectedSummary.dueTodayCount)} />
+        <Card title="overdue" value={String(expectedSummary.overdueCount)} tone={expectedSummary.overdueCount > 0 ? "bad" : "default"} />
+        <Card title="next 7 days" value={String(expectedSummary.next7DaysCount)} />
+      </div>
+
       <div className="summary-grid summary-grid--wide">
         <div className="section-card">
           <h2 className="section-title">over budget</h2>
@@ -257,6 +306,39 @@ export function DashboardPage() {
             </ul>
           )}
         </div>
+      </div>
+
+      <div className="section-card section-card--surface">
+        <div className="section-header">
+          <div className="section-title-group">
+            <h2 className="section-title">near-term expected items</h2>
+            <p className="section-subtitle">
+              pending recurring items from the last 30 days through the next 30 days. nothing here touches posted balances or monthly actuals.
+            </p>
+          </div>
+        </div>
+
+        {dueSoonOccurrences.length === 0 ? (
+          <p className="empty-state">no pending recurring items in the current last-30 / next-30-day window.</p>
+        ) : (
+          <ul className="list-compact list-compact--tight">
+            {dueSoonOccurrences.map((occurrence) => (
+              <li key={occurrence.id}>
+                {occurrence.date} · {occurrence.ruleName} · {formatCents(
+                  occurrence.kind === "transfer"
+                    ? -Math.abs(occurrence.amountCents)
+                    : occurrence.amountCents
+                )}
+                {occurrence.kind === "transfer" ? (
+                  <> · {accountMap.get(occurrence.accountId) ?? "unknown"} → {accountMap.get(occurrence.toAccountId ?? "") ?? "unknown"}</>
+                ) : occurrence.categoryName ? (
+                  <> · {occurrence.categoryName}</>
+                ) : null}
+                <> · {occurrence.status}</>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="section-card section-card--surface">

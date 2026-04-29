@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { loadOrCreatePersistedState } from "./storage";
 import { parsePersistedStateJson } from "./storage";
+import {
+  buildPendingExpectedOccurrences,
+  deriveExpectedOccurrences,
+} from "../lib/expected-occurrences";
 import { createSeedState } from "../seed/seed-data";
 import {
   LATEST_PERSISTED_STATE_VERSION,
@@ -1644,5 +1648,241 @@ describe("app store", () => {
     useAppStore.getState().unarchiveCategory("cat-food");
 
     expect(useAppStore.getState().categories[0]).not.toHaveProperty("archivedAt");
+  });
+
+  it("posts a standard expected occurrence as one recurring ledger transaction and removes it from pending derivation", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-checking",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      categories: [
+        {
+          id: "cat-rent",
+          name: "rent",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-rent",
+          kind: "standard",
+          name: "rent",
+          amountCents: -120000,
+          accountId: "acct-checking",
+          categoryId: "cat-rent",
+          merchant: "Landlord",
+          note: "autopay",
+          frequency: "monthly",
+          startDate: "2026-01-21",
+          active: true,
+          dayOfMonth: 21,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore, localStorage } = await loadStore(persisted);
+
+    const occurrence = buildPendingExpectedOccurrences(
+      deriveExpectedOccurrences(
+        useAppStore.getState().recurringRules,
+        useAppStore.getState().transactions,
+        {
+          startDate: "2026-04-01",
+          endDate: "2026-04-30",
+        },
+        {
+          today: "2026-04-21",
+          categories: useAppStore.getState().categories,
+        }
+      )
+    )[0];
+
+    useAppStore.getState().postExpectedOccurrence(occurrence);
+
+    expect(useAppStore.getState().transactions).toHaveLength(1);
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      kind: "standard",
+      date: "2026-04-21",
+      amountCents: -120000,
+      accountId: "acct-checking",
+      categoryId: "cat-rent",
+      merchant: "Landlord",
+      note: "autopay",
+      source: "recurring",
+      recurringRuleId: "rule-rent",
+    });
+    expect(
+      buildPendingExpectedOccurrences(
+        deriveExpectedOccurrences(
+          useAppStore.getState().recurringRules,
+          useAppStore.getState().transactions,
+          {
+            startDate: "2026-04-01",
+            endDate: "2026-04-30",
+          },
+          {
+            today: "2026-04-21",
+            categories: useAppStore.getState().categories,
+          }
+        )
+      )
+    ).toEqual([]);
+    expect(JSON.parse(localStorage.getItem(storagekey) ?? "null")).toMatchObject({
+      transactions: [
+        expect.objectContaining({
+          recurringRuleId: "rule-rent",
+          date: "2026-04-21",
+        }),
+      ],
+    });
+  });
+
+  it("posts a transfer expected occurrence as one linked recurring pair", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-checking",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          id: "acct-savings",
+          name: "savings",
+          type: "savings",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-save",
+          kind: "transfer",
+          name: "save",
+          amountCents: 2500,
+          accountId: "acct-checking",
+          toAccountId: "acct-savings",
+          frequency: "monthly",
+          startDate: "2026-01-21",
+          active: true,
+          dayOfMonth: 21,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    const occurrence = buildPendingExpectedOccurrences(
+      deriveExpectedOccurrences(
+        useAppStore.getState().recurringRules,
+        useAppStore.getState().transactions,
+        {
+          startDate: "2026-04-01",
+          endDate: "2026-04-30",
+        },
+        {
+          today: "2026-04-21",
+          categories: useAppStore.getState().categories,
+        }
+      )
+    )[0];
+
+    useAppStore.getState().postExpectedOccurrence(occurrence);
+
+    expect(useAppStore.getState().transactions).toHaveLength(2);
+    const [first, second] = useAppStore.getState().transactions;
+
+    expect(first).toMatchObject({
+      kind: "transfer",
+      date: "2026-04-21",
+      amountCents: -2500,
+      accountId: "acct-checking",
+      source: "recurring",
+      recurringRuleId: "rule-save",
+    });
+    expect(second).toMatchObject({
+      kind: "transfer",
+      date: "2026-04-21",
+      amountCents: 2500,
+      accountId: "acct-savings",
+      source: "recurring",
+      recurringRuleId: "rule-save",
+    });
+    expect(first.transferGroupId).toBe(second.transferGroupId);
+  });
+
+  it("prevents duplicate expected postings for the same recurring rule and date", async () => {
+    const persisted = createPersistedState({
+      accounts: [
+        {
+          id: "acct-checking",
+          name: "checking",
+          type: "checking",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      categories: [
+        {
+          id: "cat-rent",
+          name: "rent",
+          kind: "expense",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      recurringRules: [
+        {
+          id: "rule-rent",
+          kind: "standard",
+          name: "rent",
+          amountCents: -120000,
+          accountId: "acct-checking",
+          categoryId: "cat-rent",
+          frequency: "monthly",
+          startDate: "2026-01-21",
+          active: true,
+          dayOfMonth: 21,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { useAppStore } = await loadStore(persisted);
+
+    const occurrence = buildPendingExpectedOccurrences(
+      deriveExpectedOccurrences(
+        useAppStore.getState().recurringRules,
+        useAppStore.getState().transactions,
+        {
+          startDate: "2026-04-01",
+          endDate: "2026-04-30",
+        },
+        {
+          today: "2026-04-21",
+          categories: useAppStore.getState().categories,
+        }
+      )
+    )[0];
+
+    useAppStore.getState().postExpectedOccurrence(occurrence);
+    useAppStore.getState().postExpectedOccurrence(occurrence);
+
+    expect(useAppStore.getState().transactions).toHaveLength(1);
+    expect(useAppStore.getState().transactions[0]).toMatchObject({
+      recurringRuleId: "rule-rent",
+      date: "2026-04-21",
+    });
   });
 });

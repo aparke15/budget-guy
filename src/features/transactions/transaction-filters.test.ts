@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Account, Transaction } from "../../types";
 import {
+  buildExpectedTransactionListRows,
   buildTransactionListRows,
   filterTransactionRows,
   type TransactionFilters,
@@ -266,5 +267,66 @@ describe("filterTransactions", () => {
         (row) => row.id
       )
     ).toEqual(["txn-opening-balance"]);
+  });
+
+  it("filters expected rows with the same month, account, category, and search controls", () => {
+    const expectedRows = buildExpectedTransactionListRows(
+      [
+        {
+          id: "rule-rent:2026-04-12",
+          recurringRuleId: "rule-rent",
+          ruleName: "Rent",
+          kind: "standard",
+          date: "2026-04-12",
+          amountCents: -120000,
+          accountId: "acct-checking",
+          categoryId: "cat-rent",
+          categoryName: "rent",
+          categoryArchived: false,
+          merchant: "Landlord",
+          note: "Expected rent",
+          status: "upcoming",
+          matchedTransactionCount: 0,
+          daysFromToday: 1,
+        },
+        {
+          id: "rule-transfer:2026-04-14",
+          recurringRuleId: "rule-transfer",
+          ruleName: "Savings move",
+          kind: "transfer",
+          date: "2026-04-14",
+          amountCents: 5000,
+          accountId: "acct-checking",
+          toAccountId: "acct-savings",
+          categoryArchived: false,
+          status: "due",
+          matchedTransactionCount: 0,
+          daysFromToday: 3,
+        },
+      ],
+      accounts
+    );
+
+    expect(filterTransactionRows(expectedRows, createFilters()).map((row) => row.id)).toEqual([
+      "rule-rent:2026-04-12",
+      "rule-transfer:2026-04-14",
+    ]);
+    expect(
+      filterTransactionRows(
+        expectedRows,
+        createFilters({ accountId: "acct-savings" })
+      ).map((row) => row.id)
+    ).toEqual(["rule-transfer:2026-04-14"]);
+    expect(
+      filterTransactionRows(
+        expectedRows,
+        createFilters({ categoryId: "cat-rent" })
+      ).map((row) => row.id)
+    ).toEqual(["rule-rent:2026-04-12"]);
+    expect(
+      filterTransactionRows(expectedRows, createFilters({ search: "landlord" })).map(
+        (row) => row.id
+      )
+    ).toEqual(["rule-rent:2026-04-12"]);
   });
 });

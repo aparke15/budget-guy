@@ -587,6 +587,10 @@ textarea.control {
 	background: var(--bg-muted);
 }
 
+.table-row--expected {
+	background: color-mix(in srgb, var(--color-accent-surface-strong) 22%, transparent);
+}
+
 .table-actions {
 	justify-content: flex-end;
 }
@@ -619,6 +623,13 @@ textarea.control {
 .transaction-card--opening {
 	border-color: color-mix(in srgb, var(--color-opening) 24%, var(--border-default));
 	box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-opening) 55%, transparent),
+		var(--shadow-card);
+}
+
+.transaction-card--expected {
+	border-color: color-mix(in srgb, var(--color-accent) 28%, var(--border-default));
+	background: color-mix(in srgb, var(--color-accent-surface-strong) 18%, var(--bg-card));
+	box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-accent) 55%, transparent),
 		var(--shadow-card);
 }
 
@@ -1022,6 +1033,11 @@ textarea.control {
 .badge--recurring {
 	background: var(--color-recurring-surface);
 	color: var(--color-recurring);
+}
+
+.badge--expected {
+	background: color-mix(in srgb, var(--color-accent-surface-strong) 60%, transparent);
+	color: var(--color-accent);
 }
 
 .badge--credit {

@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState, type SubmitEvent } from "react";
+import { addDays, format, subDays } from "date-fns";
 
 import { useAppStore } from "../../app/store";
 import {
   type AccountHistoryRange,
+  getAllAccountBalanceComparisons,
   getAccountMonthlyHistoryRows,
-  getAllAccountBalances,
   getDisplayedAccountBalanceCents,
 } from "../../lib/account-balances";
-import { getCurrentMonth } from "../../lib/dates";
+import { getCurrentDate, getCurrentMonth } from "../../lib/dates";
+import {
+  buildAccountExpectedBalanceEffects,
+  buildDueSoonList,
+  deriveExpectedOccurrences,
+} from "../../lib/expected-occurrences";
 import { createAccount } from "../../lib/factories";
 import { formatCents } from "../../lib/money";
 import type { Account } from "../../types";
@@ -42,6 +48,7 @@ export function AccountsPage() {
   const accounts = useAppStore((state) => state.accounts);
   const budgets = useAppStore((state) => state.budgets);
   const transactions = useAppStore((state) => state.transactions);
+  const categories = useAppStore((state) => state.categories);
   const recurringRules = useAppStore((state) => state.recurringRules);
   const addAccount = useAppStore((state) => state.addAccount);
   const updateAccount = useAppStore((state) => state.updateAccount);
@@ -68,11 +75,70 @@ export function AccountsPage() {
   const [expandedBalanceAccountId, setExpandedBalanceAccountId] = useState<string | null>(null);
   const [expandedHistoryMonth, setExpandedHistoryMonth] = useState<string | null>(null);
 
+  const today = getCurrentDate();
+  const next30DayBalanceEndDate = useMemo(
+    () => format(addDays(new Date(`${today}T12:00:00`), 30), "yyyy-MM-dd"),
+    [today]
+  );
+  const pendingWindowStartDate = useMemo(
+    () => format(subDays(new Date(`${today}T12:00:00`), 30), "yyyy-MM-dd"),
+    [today]
+  );
+
   const sortedAccounts = useMemo(() => sortItemsByName(accounts), [accounts]);
 
+  const nearTermExpectedOccurrences = useMemo(
+    () =>
+      deriveExpectedOccurrences(
+        recurringRules,
+        transactions,
+        {
+          startDate: pendingWindowStartDate,
+          endDate: next30DayBalanceEndDate,
+        },
+        {
+          today,
+          categories,
+        }
+      ),
+    [categories, next30DayBalanceEndDate, pendingWindowStartDate, recurringRules, today, transactions]
+  );
+
+  const futureExpectedOccurrences = useMemo(
+    () =>
+      deriveExpectedOccurrences(
+        recurringRules,
+        transactions,
+        {
+          startDate: today,
+          endDate: next30DayBalanceEndDate,
+        },
+        {
+          today,
+          categories,
+        }
+      ),
+    [categories, next30DayBalanceEndDate, recurringRules, today, transactions]
+  );
+
+  const expectedBalanceEffects = useMemo(
+    () => buildAccountExpectedBalanceEffects(sortedAccounts, futureExpectedOccurrences),
+    [futureExpectedOccurrences, sortedAccounts]
+  );
+
   const balanceRows = useMemo(
-    () => getAllAccountBalances(sortedAccounts, transactions),
-    [sortedAccounts, transactions]
+    () =>
+      getAllAccountBalanceComparisons(
+        sortedAccounts,
+        transactions,
+        expectedBalanceEffects
+      ),
+    [expectedBalanceEffects, sortedAccounts, transactions]
+  );
+
+  const accountMap = useMemo(
+    () => new Map(sortedAccounts.map((account) => [account.id, account.name])),
+    [sortedAccounts]
   );
 
   const openingBalanceTransactionMap = useMemo(
@@ -128,6 +194,17 @@ export function AccountsPage() {
   const selectedAccount = useMemo(
     () => sortedAccounts.find((account) => account.id === selectedAccountId),
     [selectedAccountId, sortedAccounts]
+  );
+
+  const selectedAccountPendingExpected = useMemo(
+    () =>
+      selectedAccountId
+        ? buildDueSoonList(nearTermExpectedOccurrences, {
+            accountId: selectedAccountId,
+            limit: 5,
+          })
+        : [],
+    [nearTermExpectedOccurrences, selectedAccountId]
   );
 
   const historyRows = useMemo(
@@ -419,8 +496,10 @@ export function AccountsPage() {
                     <th>account</th>
                     <th>type</th>
                     <th className="money-column">balance</th>
+                    <th className="money-column">next 30d</th>
                     <th className="money-column">limit</th>
                     <th className="money-column">available credit</th>
+                    <th className="money-column">expected available</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -450,6 +529,9 @@ export function AccountsPage() {
                         <td className={`money-column ${valueClass} font-bold`}>
                           {formatCents(row.displayValueCents)}
                         </td>
+                        <td className="money-column font-semibold">
+                          {formatCents(row.expectedDisplayValueCents)}
+                        </td>
                         <td className="money-column">
                           {row.creditLimitCents != null
                             ? formatCents(row.creditLimitCents)
@@ -458,6 +540,11 @@ export function AccountsPage() {
                         <td className="money-column">
                           {row.availableCreditCents != null
                             ? formatCents(row.availableCreditCents)
+                            : "—"}
+                        </td>
+                        <td className="money-column">
+                          {row.expectedAvailableCreditCents != null
+                            ? formatCents(row.expectedAvailableCreditCents)
                             : "—"}
                         </td>
                       </tr>
@@ -510,6 +597,10 @@ export function AccountsPage() {
                       <div className="table-card__summary-footer">
                         <div className="table-card__summary-meta">
                           <span>{row.displayLabel}</span>
+                            <span className="table-card__separator" aria-hidden="true">
+                              ·
+                            </span>
+                            <span>{row.pendingExpectedCount} pending</span>
                         </div>
 
                         <span className="table-card__chevron" aria-hidden="true">
@@ -528,6 +619,16 @@ export function AccountsPage() {
                         </div>
 
                         <div className="table-card__meta-line">
+                          <span className="table-card__eyebrow">posted balance</span>
+                          <span>{formatCents(row.displayValueCents)}</span>
+                        </div>
+
+                        <div className="table-card__meta-line">
+                          <span className="table-card__eyebrow">next 30d</span>
+                          <span>{formatCents(row.expectedDisplayValueCents)}</span>
+                        </div>
+
+                        <div className="table-card__meta-line">
                           <span className="table-card__eyebrow">credit limit</span>
                           <span>
                             {row.creditLimitCents != null
@@ -542,6 +643,13 @@ export function AccountsPage() {
                             <span>{formatCents(row.availableCreditCents)}</span>
                           </div>
                         ) : null}
+
+                        {row.expectedAvailableCreditCents != null ? (
+                          <div className="table-card__meta-line">
+                            <span className="table-card__eyebrow">expected available</span>
+                            <span>{formatCents(row.expectedAvailableCreditCents)}</span>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </article>
@@ -549,6 +657,45 @@ export function AccountsPage() {
               })}
             </div>
           </>
+        )}
+      </div>
+
+      <div className="section-card section-card--surface">
+        <div className="section-header">
+          <div className="section-title-group">
+            <h2 className="section-title">
+              {selectedAccount?.name ?? "selected account"} pending expected items
+            </h2>
+            <p className="section-subtitle">
+              derived recurring items from the last 30 days through the next 30 days. posted balances stay ledger-driven.
+            </p>
+          </div>
+        </div>
+
+        {!selectedAccount ? (
+          <p className="empty-state">select an account to inspect pending expected activity.</p>
+        ) : selectedAccountPendingExpected.length === 0 ? (
+          <p className="empty-state">no pending expected items for this account in the current last-30 / next-30-day window.</p>
+        ) : (
+          <ul className="list-compact list-compact--tight">
+            {selectedAccountPendingExpected.map((occurrence) => (
+              <li key={occurrence.id}>
+                {occurrence.date} · {occurrence.ruleName} · {formatCents(
+                  occurrence.kind === "transfer" && occurrence.accountId === selectedAccount.id
+                    ? -Math.abs(occurrence.amountCents)
+                    : occurrence.kind === "transfer" && occurrence.toAccountId === selectedAccount.id
+                      ? Math.abs(occurrence.amountCents)
+                      : occurrence.amountCents
+                )}
+                {occurrence.kind === "transfer" ? (
+                  <> · {accountMap.get(occurrence.accountId) ?? "unknown"} → {accountMap.get(occurrence.toAccountId ?? "") ?? "unknown"}</>
+                ) : occurrence.categoryName ? (
+                  <> · {occurrence.categoryName}</>
+                ) : null}
+                <> · {occurrence.status}</>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 

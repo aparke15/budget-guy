@@ -41,6 +41,14 @@ export function getMonthKey(date: string): string {
   return date.slice(0, 7);
 }
 
+export function getDateKey(date: Date): string {
+  return format(date, "yyyy-MM-dd");
+}
+
+export function getCurrentDate(): string {
+  return getDateKey(new Date());
+}
+
 export function getCurrentMonth(): string {
   return format(new Date(), "yyyy-MM");
 }

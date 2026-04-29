@@ -16,6 +16,14 @@ export type AccountBalanceRow = {
   availableCreditCents?: number;
 };
 
+export type AccountBalanceComparisonRow = AccountBalanceRow & {
+  pendingExpectedCount: number;
+  pendingExpectedChangeCents: number;
+  expectedBalanceCents: number;
+  expectedDisplayValueCents: number;
+  expectedAvailableCreditCents?: number;
+};
+
 export type AccountMonthlyHistoryRow = {
   month: string;
   inflowsCents: number;
@@ -82,6 +90,56 @@ export function getAllAccountBalances(
       displayValueCents: getDisplayedAccountBalanceCents(account, balanceCents),
       creditLimitCents: account.creditLimitCents,
       availableCreditCents: getAvailableCreditCents(account, balanceCents),
+    };
+  });
+}
+
+export function getExpectedAccountBalanceCents(
+  currentBalanceCents: number,
+  pendingExpectedChangeCents: number
+): number {
+  return currentBalanceCents + pendingExpectedChangeCents;
+}
+
+export function getAllAccountBalanceComparisons(
+  accounts: Account[],
+  transactions: Transaction[],
+  expectedEffects: Array<{
+    accountId: string;
+    pendingCount: number;
+    netExpectedChangeCents: number;
+  }>
+): AccountBalanceComparisonRow[] {
+  const effectMap = new Map(
+    expectedEffects.map((effect) => [effect.accountId, effect])
+  );
+
+  return getAllAccountBalances(accounts, transactions).map((row) => {
+    const effect = effectMap.get(row.accountId);
+    const pendingExpectedChangeCents = effect?.netExpectedChangeCents ?? 0;
+    const expectedBalanceCents = getExpectedAccountBalanceCents(
+      row.balanceCents,
+      pendingExpectedChangeCents
+    );
+
+    return {
+      ...row,
+      pendingExpectedCount: effect?.pendingCount ?? 0,
+      pendingExpectedChangeCents,
+      expectedBalanceCents,
+      expectedDisplayValueCents: getDisplayedAccountBalanceCents(
+        {
+          type: row.accountType,
+        },
+        expectedBalanceCents
+      ),
+      expectedAvailableCreditCents: getAvailableCreditCents(
+        {
+          type: row.accountType,
+          creditLimitCents: row.creditLimitCents,
+        },
+        expectedBalanceCents
+      ),
     };
   });
 }
